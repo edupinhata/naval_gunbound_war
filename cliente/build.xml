@@ -1,15 +1,15 @@
 <project name="Cliente" default="run">
 
 	<property name="main-class" value="naval.cliente.Cliente"/>
+	<property name="depends" value="../protocolo"/>
 
 	<property name="src.dir" value="src"/>
-	<property name="lib.dir" value="lib"/>
 	<property name="build.dir" value="build"/>
 	<property name="classes.dir" value="${build.dir}/classes"/>
 	<property name="jar.dir" value="${build.dir}/jar"/>
 
 	<path id="classpath">
-		<fileset dir="${lib.dir}" includes="**/*.jar"/>
+		<pathelement location="${depends}/${classes.dir}"/>
 	</path>
 
 	<target name="clean">
@@ -22,9 +22,9 @@
 	</target>
 
 	<target name="jar" depends="compile">
+		<ant antfile="${depends}/build.xml"/>
 		<mkdir dir="${jar.dir}"/>
 		<jar destfile="${jar.dir}/${ant.project.name}.jar" basedir="${classes.dir}">
-			<zipgroupfileset dir="${lib.dir}" includes="*.jar"/>
 			<manifest>
 				<attribute name="Main-Class" value="${main-class}"/>
 			</manifest>
