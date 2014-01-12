@@ -1,7 +1,6 @@
-<project name="Servidor" default="run">
+<project name="Server" default="run">
 
-	<property name="main-class" value="naval.servidor.Servidor"/>
-	<property name="depends.dir" value="../protocolo"/>
+	<property name="main-class" value="Server"/>
 
 	<property name="src.dir" value="src"/>
 	<property name="build.dir" value="build"/>
@@ -10,17 +9,9 @@
 
 	<target name="clean">
 		<delete dir="${build.dir}"/>
-		<ant dir="${depends.dir}" target="clean"/>
 	</target>
 
-	<target name="depends">
-		<ant dir="${depends.dir}"/>
-		<copy todir="${classes.dir}">
-			<fileset dir="${depends.dir}/${classes.dir}"/>
-		</copy>
-	</target>
-
-	<target name="compile" depends="depends">
+	<target name="compile">
 		<mkdir dir="${classes.dir}"/>
 		<javac srcdir="${src.dir}" destdir="${classes.dir}" includeantruntime="false"/>
 	</target>
