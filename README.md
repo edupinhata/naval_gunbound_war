@@ -8,31 +8,40 @@ Compilando o servidor
 =====================
 
 * Dependências: `git` `ant`
+
 `sudo apt-get install git ant`
 
 * Clonando o repositório:
+
 `git clone https://github.com/edupinhata/naval_gunbound_war`
 
-* Compilando:
+* Compilar:
+
 `cd naval_gunbound_war/servidor`
-`ant jar`
+
+`ant`
 
 Testando o servidor
 ===================
 
 * Dependência: `curl`
+
 `sudo apt-get install curl`
 
-* Rodando o servidor (porta 80 necessita de sudo):
+* Rodar o servidor (porta 80 necessita de sudo) (bloqueia o terminal):
+
 `sudo ant run`
 
-* Em outro terminal, criando um usuário no servidor (HTTP POST):
+* Criar um usuário no servidor (HTTP POST):
+
 `TOKEN=$(curl -d "" "localhost/token")`
 
-* Escutando mensagens direcionadas ao usuário do servidor (HTTP GET):
+* Escutar mensagens direcionadas ao usuário do servidor (HTTP GET) (bloqueia o terminal):
+
 `curl "localhost/stream?token=$TOKEN"`
 
-* Em outro terminal, enviando mensagens para todos os usuários do servidor (HTTP POST):
+* Enviar mensagens para todos os usuários do servidor (HTTP POST):
+
 `curl -d "mensagem" "localhost/broadcast"`
 
 RASCUNHO DO PROJETO
