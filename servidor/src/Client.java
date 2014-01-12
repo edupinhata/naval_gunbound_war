@@ -5,16 +5,19 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 class Client {
 
-	protected static ConcurrentHashMap<Integer, Client> pool;
+	// todos os clientes, mapeados pelos seus tokens
+	protected static ConcurrentHashMap<Integer, Client> pool =
+		new ConcurrentHashMap<Integer, Client>();
 
-	protected ConcurrentLinkedDeque<OutputStream> streams;
-	protected Integer token;
+	// um cliente pode escutar mensagens através de mais uma conexão
+	protected ConcurrentLinkedDeque<OutputStream> streams =
+		new ConcurrentLinkedDeque<OutputStream>();
+	// identificador do cliente
+	protected final Integer token;
 
-	static
-	{
-		pool = new ConcurrentHashMap<Integer, Client>();
-	}
-
+	// procura o cliente correspondente a um token e adiciona uma conexão para
+	// escuta
+	// TODO retornar true ou false
 	public static void addStream(Integer token, OutputStream stream)
 	{
 		Client c = pool.get(token);
@@ -22,20 +25,24 @@ class Client {
 			c.streams.add(stream);
 	}
 
+	// envia uma mensagem para todos os clientes
 	public static void broadcast(String data)
 	{
 		for (Client c : pool.values())
 			c.stream(data);
 	}
 
+	// construtor, adiciona ao mapa de todos os clientes se já não existir. se
+	// já existir, este objeto será garbage collected.
+	// TODO: fazer método estático para criação ao invés disto
 	public Client(Integer token)
 	{
 		this.token = token;
-		streams = new ConcurrentLinkedDeque<OutputStream>();
 
 		pool.putIfAbsent(token, this);
 	}
 
+	// envia uma mensagem para o cliente através de todos o seus canais de escuta
 	public void stream(String data)
 	{
 		data += "\n";
@@ -44,7 +51,10 @@ class Client {
 				o.write(data.getBytes());
 				o.flush();
 			} catch (IOException e1) {
+				e1.printStackTrace();
+				// se o canal está quebrado, remove da lista
 				try {
+					// garante o fechamento
 					o.close();
 				} catch (IOException e2) {
 					e2.printStackTrace();
