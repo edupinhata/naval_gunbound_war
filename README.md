@@ -11,7 +11,11 @@ Compilando o servidor
 
 `sudo apt-get install git ant`
 
-* Clonando o repositório:
+* Atualizando o repositório se já tiver:
+
+`git pull`
+
+* Se não tiver:
 
 `git clone https://github.com/edupinhata/naval_gunbound_war`
 
