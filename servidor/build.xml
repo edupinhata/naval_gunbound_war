@@ -1,4 +1,4 @@
-<project name="Server" default="run">
+<project name="Server" default="jar">
 
 	<property name="main-class" value="Server"/>
 

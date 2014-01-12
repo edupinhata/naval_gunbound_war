@@ -1,4 +1,4 @@
-<project name="Client" default="run">
+<project name="Client" default="jar">
 
 	<property name="main-class" value="Client"/>
 
