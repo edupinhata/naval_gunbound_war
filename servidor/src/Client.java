@@ -42,10 +42,13 @@ class Client {
 		pool.putIfAbsent(token, this);
 	}
 
-	// envia uma mensagem para o cliente através de todos o seus canais de escuta
+	// envia uma mensagem para o cliente através de todas as suas conexões de
+	// escuta
 	public void stream(String data)
 	{
 		// faz com que a mensagem inteira possa ser lida com um "readLine()"
+		// o cliente deve formatar a mensagem de volta - trivial
+		data.replaceAll("\\n", "\\\\n");
 		data.replaceAll("\n", "\\n");
 		data += "\n";
 
@@ -55,7 +58,7 @@ class Client {
 				o.flush();
 			} catch (IOException e1) {
 				e1.printStackTrace();
-				// se o canal está quebrado, remove da lista
+				// se a conexão está quebrada, remove da lista
 				try {
 					// garante o fechamento
 					o.close();
