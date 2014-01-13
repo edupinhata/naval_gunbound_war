@@ -45,7 +45,10 @@ class Client {
 	// envia uma mensagem para o cliente através de todos o seus canais de escuta
 	public void stream(String data)
 	{
+		// faz com que a mensagem inteira possa ser lida com um "readLine()"
+		data.replaceAll("\n", "\\n");
 		data += "\n";
+
 		for (OutputStream o : streams) {
 			try {
 				o.write(data.getBytes());
