@@ -6,6 +6,31 @@ import com.sun.net.httpserver.HttpExchange;
 
 public abstract class Handler implements HttpHandler {
 
+	// retorna o tamanho do corpo da mensagem
+	protected static int getLength(HttpExchange e)
+	{
+		try {
+			return Integer.parseInt(e.getRequestHeaders().get("Content-Length").get(0));
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			return 0;
+		}
+	}
+
+	// lê e retorna o corpo da mensagem
+	protected static String getBody(HttpExchange e)
+	{
+		try {
+			int length = getLength(e);
+			byte[] in = new byte[length];
+			e.getRequestBody().read(in, 0, length);
+			return new String(in);
+		} catch (Exception ex) {
+			ex.printStackTrace();
+			return new String();
+		}
+	}
+
 	// obtém os argumentos do link solicitado, (ex. token na classe Streamer)
 	protected static Map<String, String[]> getParams(HttpExchange e)
 	{
