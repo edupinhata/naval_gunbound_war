@@ -32,7 +32,7 @@ public class Tokenizer extends Handler {
 
 		// envia token para o remetente
 		byte[] b = t.getBytes();
-		e.sendResponseHeaders(200, b.length);
+		e.sendResponseHeaders(201, b.length); // Created
 		o.write(b);
 
 		// fecha a conexão

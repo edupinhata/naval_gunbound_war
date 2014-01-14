@@ -11,24 +11,26 @@ public class Streamer extends Handler {
 	{
 		OutputStream o = e.getResponseBody();
 
-		// obtém os argumentos da requisição
+		// necessita do argumento token. se não houver, manda erro e fecha o
+		// stream.
 		Map<String, String[]> p = getParams(e);
-
-		// necessita do argumento token
 		String[] t = p.get("token");
 		if (t == null) {
-			e.sendResponseHeaders(404, 0);
+			e.sendResponseHeaders(400, 0); // Bad Request
 			o.close();
 			return;
 		}
 
-		// envia ok, mas não fecha a conexão
-		e.sendResponseHeaders(200, 0);
+		// procura cliente correspondente ao token. se não achar, manda erro e
+		// fecha o stream.
+		if (!Client.addStream(t[0], o)) {
+			e.sendResponseHeaders(404, 0); // Not Found
+			o.close();
+			return;
+		}
 
-		// adiciona conexão a um cliente se o token correspondente existir
-		Client.addStream(t[0], o);
-
-		//TODO verificar se o token existe, se não existir, fechar a conexão
+		// manda ok e deixa o stream aberto pro cliente receber mensagens.
+		e.sendResponseHeaders(200, 0); // OK
 	}
 
 }

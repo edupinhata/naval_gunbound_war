@@ -19,7 +19,7 @@ public class Broadcaster extends Handler {
 		Client.broadcast(new String(data));
 
 		// retorna ok para o remetente
-		e.sendResponseHeaders(200, 0);
+		e.sendResponseHeaders(200, 0); // OK
 		e.getResponseBody().close();
 	}
 
