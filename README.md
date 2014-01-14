@@ -4,12 +4,12 @@ naval_gunbound_war
 Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribuído.
 
 
-Compilando o servidor
+Testando o servidor
 =====================
 
-* Dependências: `git` `ant`
+* Dependências: `git` `ant` `curl`
 
-`sudo apt-get install git ant`
+`sudo apt-get install git ant curl`
 
 * Atualizando o repositório se já tiver:
 
@@ -21,32 +21,23 @@ Compilando o servidor
 
 * Compilar:
 
+* Compilar e rodar o servidor (bloqueia o terminal):
+
 `cd naval_gunbound_war/servidor`
 
-`ant`
-
-Testando o servidor
-===================
-
-* Dependência: `curl`
-
-`sudo apt-get install curl`
-
-* Rodar o servidor (porta 80 necessita de sudo) (bloqueia o terminal):
-
-`sudo ant run`
+`ant && ant run`
 
 * Criar um usuário no servidor (HTTP POST):
 
-`TOKEN=$(curl -d "" "localhost/token")`
+`TOKEN=$(curl -d "" "localhost:8000/token")`
 
 * Escutar mensagens direcionadas ao usuário do servidor (HTTP GET) (bloqueia o terminal):
 
-`curl "localhost/stream?token=$TOKEN"`
+`curl "localhost:8000/stream?token=$TOKEN"`
 
 * Enviar mensagens para todos os usuários do servidor (HTTP POST):
 
-`curl -d "mensagem" "localhost/broadcast"`
+`curl -d "mensagem" "localhost:8000/broadcast"`
 
 RASCUNHO DO PROJETO
 ==============================

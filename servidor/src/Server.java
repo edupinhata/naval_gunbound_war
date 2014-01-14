@@ -6,8 +6,8 @@ public class Server {
 	
 	public static void main(String[] args) throws Exception
 	{
-		// cria servidor na porta 80 (HTTP)
-		HttpServer s = HttpServer.create(new InetSocketAddress(80), 0);
+		// cria servidor na porta 8000 (HTTP)
+		HttpServer s = HttpServer.create(new InetSocketAddress(8000), 0);
 
 		// permite multi-threading, caso contrário o servidor bloqueia a cada
 		// requisição
