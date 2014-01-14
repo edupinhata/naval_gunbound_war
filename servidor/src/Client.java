@@ -21,6 +21,21 @@ class Client {
 		pool.putIfAbsent(token, new Client(token));
 	}
 
+	// caso não exista um cliente com o token, adiciona um novo ao mapa
+	public static boolean remove(String token)
+	{
+		Client c = pool.remove(token);
+		if (c == null)
+			return false;
+		for (OutputStream o : c.streams)
+			try {
+				o.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		return true;
+	}
+
 	// procura o cliente correspondente a um token e adiciona uma conexão para
 	// escuta. retorna false se o cliente não existe.
 	public static boolean addStream(String token, OutputStream stream)

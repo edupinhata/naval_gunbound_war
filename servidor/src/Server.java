@@ -15,6 +15,7 @@ public class Server {
 
 		// cria contextos e respectivos handlers
 		s.createContext("/token", new Tokenizer());
+		s.createContext("/delete", new Deleter());
 		s.createContext("/stream", new Streamer());
 		s.createContext("/broadcast", new Broadcaster());
 
