@@ -6,19 +6,19 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 class Client {
 
 	// todos os clientes, mapeados pelos seus tokens
-	protected static ConcurrentHashMap<Integer, Client> pool =
-		new ConcurrentHashMap<Integer, Client>();
+	protected static ConcurrentHashMap<String, Client> pool =
+		new ConcurrentHashMap<String, Client>();
 
 	// um cliente pode escutar mensagens através de mais uma conexão
 	protected ConcurrentLinkedDeque<OutputStream> streams =
 		new ConcurrentLinkedDeque<OutputStream>();
 	// identificador do cliente
-	protected final Integer token;
+	protected final String token;
 
 	// procura o cliente correspondente a um token e adiciona uma conexão para
 	// escuta
 	// TODO retornar true ou false
-	public static void addStream(Integer token, OutputStream stream)
+	public static void addStream(String token, OutputStream stream)
 	{
 		Client c = pool.get(token);
 		if (c != null)
@@ -35,7 +35,7 @@ class Client {
 	// construtor, adiciona ao mapa de todos os clientes se já não existir. se
 	// já existir, este objeto será garbage collected.
 	// TODO: fazer método estático para criação ao invés disto
-	public Client(Integer token)
+	public Client(String token)
 	{
 		this.token = token;
 

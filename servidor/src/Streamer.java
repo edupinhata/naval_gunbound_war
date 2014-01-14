@@ -26,7 +26,7 @@ public class Streamer extends Handler {
 		e.sendResponseHeaders(200, 0);
 
 		// adiciona conexão a um cliente se o token correspondente existir
-		Client.addStream(Integer.parseInt(t[0]), o);
+		Client.addStream(t[0], o);
 
 		//TODO verificar se o token existe, se não existir, fechar a conexão
 	}

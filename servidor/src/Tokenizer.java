@@ -1,13 +1,25 @@
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigInteger;
+import java.security.MessageDigest;
 import com.sun.net.httpserver.HttpExchange;
 
 public class Tokenizer extends Handler {
 
 	// o token é gerado a partir do hash do IP+porta
-	protected static Integer getToken(HttpExchange e)
+	protected static String getToken(HttpExchange e)
 	{
-		return e.getRemoteAddress().toString().hashCode();
+		String t = "";
+		try {
+			MessageDigest d = MessageDigest.getInstance("MD5");
+			byte[] in = e.getRemoteAddress().toString().getBytes();
+			byte[] out = d.digest(in);
+			t = new BigInteger(1, out).toString(16);
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		} finally {
+			return t;
+		}
 	}
 
 	@Override
@@ -15,11 +27,11 @@ public class Tokenizer extends Handler {
 	{
 		OutputStream o = e.getResponseBody();
 
-		Integer t = getToken(e);
+		String t = getToken(e);
 		new Client(t);
 
 		// envia token para o remetente
-		byte[] b = t.toString().getBytes();
+		byte[] b = t.getBytes();
 		e.sendResponseHeaders(200, b.length);
 		o.write(b);
 
