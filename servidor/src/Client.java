@@ -22,13 +22,14 @@ class Client {
 	}
 
 	// procura o cliente correspondente a um token e adiciona uma conexão para
-	// escuta
-	// TODO retornar true ou false
-	public static void addStream(String token, OutputStream stream)
+	// escuta. retorna false se o cliente não existe.
+	public static boolean addStream(String token, OutputStream stream)
 	{
 		Client c = pool.get(token);
-		if (c != null)
-			c.streams.add(stream);
+		if (c == null)
+			return false;
+		c.streams.add(stream);
+		return true;
 	}
 
 	// envia uma mensagem para todos os clientes
