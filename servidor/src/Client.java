@@ -3,25 +3,46 @@ import java.io.OutputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+/**
+ * Classe representando um único cliente, que pode se comunicar por vários
+ * canais.
+ */
 class Client {
 
-	// todos os clientes, mapeados pelos seus tokens
+	/**
+	 * Mapeia cada cliente por um token único.
+	 */
 	protected static ConcurrentHashMap<String, Client> pool =
 		new ConcurrentHashMap<String, Client>();
 
-	// um cliente pode escutar mensagens através de mais uma conexão
+	/**
+	 * Lista de canais de saída do cliente.
+	 */
 	protected ConcurrentLinkedDeque<OutputStream> streams =
 		new ConcurrentLinkedDeque<OutputStream>();
-	// identificador do cliente
+
+	/**
+	 * Identificador único do cliente.
+	 */
 	protected final String token;
 
-	// caso não exista um cliente com o token, adiciona um novo ao mapa
+	/**
+	 * Cria um novo cliente e o mapeia, se já não existir.
+	 * TODO: retornar booleano
+	 *
+	 * @param token O token que mapeia o cliente.
+	 */
 	public static void create(String token)
 	{
 		pool.putIfAbsent(token, new Client(token));
 	}
 
-	// caso não exista um cliente com o token, adiciona um novo ao mapa
+	/**
+	 * Remove um cliente e fecha todas suas conexões, se existir.
+	 *
+	 * @param token O token que mapeia o cliente.
+	 * @return Se o cliente existia e foi removido com sucesso.
+	 */
 	public static boolean remove(String token)
 	{
 		Client c = pool.remove(token);
@@ -32,12 +53,18 @@ class Client {
 				o.close();
 			} catch (IOException e) {
 				e.printStackTrace();
+			} finally {
+				continue;
 			}
-		return true;
 	}
 
-	// procura o cliente correspondente a um token e adiciona uma conexão para
-	// escuta. retorna false se o cliente não existe.
+	/**
+	 * Adiciona um canal de escuta para um cliente, se existir.
+	 *
+	 * @param token O token que mapeia o cliente.
+	 * @param stream O canal.
+	 * @return Se o cliente existe.
+	 */
 	public static boolean addStream(String token, OutputStream stream)
 	{
 		Client c = pool.get(token);
@@ -47,25 +74,43 @@ class Client {
 		return true;
 	}
 
-	// envia uma mensagem para todos os clientes
+	/**
+	 * Envia uma mensagem para todos os clientes.
+	 *
+	 * @param data A mensagem.
+	 * @see #stream(String)
+	 */
 	public static void broadcast(String data)
 	{
 		for (Client c : pool.values())
 			c.stream(data);
 	}
 
-	// construtor
+	/**
+	 * Construtor.
+	 *
+	 * @see #create(String)
+	 */
 	protected Client(String token)
 	{
 		this.token = token;
 	}
 
-	// envia uma mensagem para o cliente através de todas as suas conexões de
-	// escuta
+	/**
+	 * Envia uma mensagem para o cliente através de todas os seus canais de
+	 * escuta.
+	 * <p>
+	 * Como o campo Content-Length é omitido, o cliente não sabe o tamanho de
+	 * cada mensagem, portanto a mensagem é formatada para que ocupe apenas uma
+	 * linha, indicando o fim de uma única mensagem.
+	 * <p>
+	 * Se algum canal estiver fechado/quebrado, é removido da lista do cliente.
+	 *
+	 * @param data A mensagem.
+	 * @see #streams
+	 */
 	public void stream(String data)
 	{
-		// faz com que a mensagem inteira possa ser lida com um "readLine()"
-		// o cliente deve formatar a mensagem de volta - trivial
 		data.replaceAll("\\n", "\\\\n");
 		data.replaceAll("\n", "\\n");
 		data += "\n";
@@ -76,9 +121,7 @@ class Client {
 				o.flush();
 			} catch (IOException e1) {
 				e1.printStackTrace();
-				// se a conexão está quebrada, remove da lista
 				try {
-					// garante o fechamento
 					o.close();
 				} catch (IOException e2) {
 					e2.printStackTrace();

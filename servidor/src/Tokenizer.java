@@ -4,9 +4,19 @@ import java.math.BigInteger;
 import java.security.MessageDigest;
 import com.sun.net.httpserver.HttpExchange;
 
+/**
+ * Handler que cria um cliente e o mapeia para um token.
+ *
+ * @see Client
+ */
 public class Tokenizer extends Handler {
 
-	// o token é gerado a partir do hash do IP+porta
+	/**
+	 * Gera um token a partir do hash do endereço do remetente.
+	 *
+	 * @param e O objeto do qual o endereço é lido.
+	 * @return O token.
+	 */
 	protected static String getToken(HttpExchange e)
 	{
 		String t = "";
@@ -22,6 +32,15 @@ public class Tokenizer extends Handler {
 		}
 	}
 
+	/**
+	 * Cria um cliente e devolve seu token para o remetente da requisição POST.
+	 * <p>
+	 * O código 201 Created é retornado no cabeçalho.
+	 *
+	 * @param e O objeto que representa a requisição.
+	 * @throws IOException Se houver erro na conexão.
+	 * @see Client#create(String)
+	 */
 	@Override
 	public void handlePost(HttpExchange e) throws IOException
 	{
@@ -30,12 +49,10 @@ public class Tokenizer extends Handler {
 		String t = getToken(e);
 		Client.create(t);
 
-		// envia token para o remetente
 		byte[] b = t.getBytes();
-		e.sendResponseHeaders(201, b.length); // Created
+		e.sendResponseHeaders(201, b.length);
 		o.write(b);
 
-		// fecha a conexão
 		o.close();
 	}
 

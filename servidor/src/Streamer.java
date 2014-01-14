@@ -4,33 +4,47 @@ import java.io.IOException;
 import java.io.OutputStream;
 import com.sun.net.httpserver.HttpExchange;
 
+/**
+ * Handler que adiciona um canal de escuta a um cliente.
+ *
+ * @see Client
+ */
 public class Streamer extends Handler {
 
+	/**
+	 * A partir de um token, mantém a conexão de saída da requisição GET aberta
+	 * para que todas as mensagens enviadas para o respectivo cliente sejam
+	 * enviadas para esta conexão.
+	 * <p>
+	 * O token do cliente deve ser passado por parâmetro na query da URI.
+	 * Exemplo: ?token=0123456789abcdef. Se não for passado, retorna o código de
+	 * erro 400 Bad Request, e se o cliente não existir, retorna o código de
+	 * erro 404 Not Found. Nestes casos, a conexão é fechada.
+	 *
+	 * @param e O objeto representando a requisição.
+	 * @throws IOException Se houver erro na conexão.
+	 * @see Client#stream(String)
+	 */
 	@Override
 	public void handleGet(HttpExchange e) throws IOException
 	{
 		OutputStream o = e.getResponseBody();
 
-		// necessita do argumento token. se não houver, manda erro e fecha o
-		// stream.
 		Map<String, String[]> p = getParams(e);
 		String[] t = p.get("token");
 		if (t == null) {
-			e.sendResponseHeaders(400, 0); // Bad Request
+			e.sendResponseHeaders(400, 0);
 			o.close();
 			return;
 		}
 
-		// procura cliente correspondente ao token. se não achar, manda erro e
-		// fecha o stream.
 		if (!Client.addStream(t[0], o)) {
-			e.sendResponseHeaders(404, 0); // Not Found
+			e.sendResponseHeaders(404, 0);
 			o.close();
 			return;
 		}
 
-		// manda ok e deixa o stream aberto pro cliente receber mensagens.
-		e.sendResponseHeaders(200, 0); // OK
+		e.sendResponseHeaders(200, 0);
 	}
 
 }
