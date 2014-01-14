@@ -28,7 +28,7 @@ public class Tokenizer extends Handler {
 		OutputStream o = e.getResponseBody();
 
 		String t = getToken(e);
-		new Client(t);
+		Client.create(t);
 
 		// envia token para o remetente
 		byte[] b = t.getBytes();

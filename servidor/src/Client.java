@@ -15,6 +15,12 @@ class Client {
 	// identificador do cliente
 	protected final String token;
 
+	// caso não exista um cliente com o token, adiciona um novo ao mapa
+	public static void create(String token)
+	{
+		pool.putIfAbsent(token, new Client(token));
+	}
+
 	// procura o cliente correspondente a um token e adiciona uma conexão para
 	// escuta
 	// TODO retornar true ou false
@@ -32,14 +38,10 @@ class Client {
 			c.stream(data);
 	}
 
-	// construtor, adiciona ao mapa de todos os clientes se já não existir. se
-	// já existir, este objeto será garbage collected.
-	// TODO: fazer método estático para criação ao invés disto
-	public Client(String token)
+	// construtor
+	protected Client(String token)
 	{
 		this.token = token;
-
-		pool.putIfAbsent(token, this);
 	}
 
 	// envia uma mensagem para o cliente através de todas as suas conexões de
