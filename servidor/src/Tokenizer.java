@@ -47,12 +47,14 @@ public class Tokenizer extends Handler {
 		OutputStream o = e.getResponseBody();
 
 		String t = getToken(e);
-		Client.create(t);
-
 		byte[] b = t.getBytes();
-		e.sendResponseHeaders(201, b.length);
-		o.write(b);
 
+		if (!Client.create(t));
+			e.sendResponseHeaders(200, b.length);
+		else
+			e.sendResponseHeaders(201, b.length);
+
+		o.write(b);
 		o.close();
 	}
 

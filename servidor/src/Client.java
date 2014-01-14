@@ -28,13 +28,16 @@ class Client {
 
 	/**
 	 * Cria um novo cliente e o mapeia, se já não existir.
-	 * TODO: retornar booleano
 	 *
 	 * @param token O token que mapeia o cliente.
+	 * @return Se o cliente não existia e foi adicionado com sucesso.
 	 */
-	public static void create(String token)
+	public static boolean create(String token)
 	{
-		pool.putIfAbsent(token, new Client(token));
+		if (pool.containsKey(token))
+			return false;
+		pool.put(token, new Client(token));
+		return true;
 	}
 
 	/**
