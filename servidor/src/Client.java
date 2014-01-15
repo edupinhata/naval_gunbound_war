@@ -66,15 +66,9 @@ public class Client {
 			try {
 				o.write(data.getBytes());
 				o.flush();
-			} catch (IOException e1) {
-				e1.printStackTrace();
-				try {
-					o.close();
-				} catch (IOException e2) {
-					e2.printStackTrace();
-				} finally {
-					streams.remove(o);
-				}
+			} catch (IOException ex) {
+				ex.printStackTrace();
+				streams.remove(o);
 			}
 		}
 	}
