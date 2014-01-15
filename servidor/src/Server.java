@@ -14,10 +14,11 @@ public class Server {
 		s.setExecutor(Executors.newCachedThreadPool());
 
 		// cria contextos e respectivos handlers
-		s.createContext("/token", new Tokenizer());
-		s.createContext("/delete", new Deleter());
-		s.createContext("/stream", new Streamer());
-		s.createContext("/broadcast", new Broadcaster());
+		Game g = new Game();
+		s.createContext("/token", new Tokenizer(g));
+		s.createContext("/delete", new Deleter(g));
+		s.createContext("/stream", new Streamer(g));
+		s.createContext("/broadcast", new Broadcaster(g));
 
 		// roda o servidor
 		s.start();

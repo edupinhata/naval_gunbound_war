@@ -18,6 +18,21 @@ import com.sun.net.httpserver.*;
 public abstract class Handler implements HttpHandler {
 
 	/**
+	 * O jogo gerenciado pelas subclasses.
+	 */
+	protected Game game;
+
+	/**
+	 * Construtor.
+	 *
+	 * @param g O jogo a ser gerenciado.
+	 */
+	public Handler(Game g)
+	{
+		game = g;
+	}
+
+	/**
 	 * Lê o campo "Content-Length" do cabeçalho de uma requisição HTTP e devolve
 	 * seu valor.
 	 *

@@ -9,6 +9,16 @@ import com.sun.net.httpserver.*;
 public class Deleter extends Handler {
 
 	/**
+	 * Construtor.
+	 *
+	 * @see Handler#Handler(Game)
+	 */
+	public Deleter(Game g)
+	{
+		super(g);
+	}
+
+	/**
 	 * Lê um token do corpo da requisição POST e remove o cliente
 	 * correspondente.
 	 * <p>

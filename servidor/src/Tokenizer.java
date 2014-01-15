@@ -11,6 +11,16 @@ import com.sun.net.httpserver.*;
 public class Tokenizer extends Handler {
 
 	/**
+	 * Construtor.
+	 *
+	 * @see Handler#Handler(Game)
+	 */
+	public Tokenizer(Game g)
+	{
+		super(g);
+	}
+
+	/**
 	 * Gera um token a partir do hash do endereço do remetente.
 	 *
 	 * @param e O objeto do qual o endereço é lido.

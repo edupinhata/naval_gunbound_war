@@ -10,6 +10,16 @@ import com.sun.net.httpserver.*;
 public class Streamer extends Handler {
 
 	/**
+	 * Construtor.
+	 *
+	 * @see Handler#Handler(Game)
+	 */
+	public Streamer(Game g)
+	{
+		super(g);
+	}
+
+	/**
 	 * A partir de um token, mantém a conexão de saída da requisição GET aberta
 	 * para que todas as mensagens enviadas para o respectivo cliente sejam
 	 * enviadas para esta conexão.

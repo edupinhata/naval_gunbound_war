@@ -9,6 +9,16 @@ import com.sun.net.httpserver.*;
 public class Broadcaster extends Handler {
 
 	/**
+	 * Construtor.
+	 *
+	 * @see Handler#Handler(Game)
+	 */
+	public Broadcaster(Game g)
+	{
+		super(g);
+	}
+
+	/**
 	 * Lê os dados de uma requisição POST e os envia para todos os clientes.
 	 *
 	 * @param e O objeto do qual a mensagem é lida.
