@@ -1,13 +1,13 @@
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.io.*;
+import java.util.concurrent.*;
 
 /**
  * Classe representando um único cliente, que pode se comunicar por vários
  * canais.
+ * <p>
+ * Gerencia suas próprias instâncias através de campos estáticos.
  */
-class Client {
+public class Client {
 
 	/**
 	 * Mapeia cada cliente por um token único.

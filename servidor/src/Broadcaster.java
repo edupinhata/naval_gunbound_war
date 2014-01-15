@@ -1,6 +1,5 @@
-import java.io.IOException;
-import java.io.InputStream;
-import com.sun.net.httpserver.HttpExchange;
+import java.io.*;
+import com.sun.net.httpserver.*;
 
 /**
  * Handler que envia mensagens para todos os clientes.

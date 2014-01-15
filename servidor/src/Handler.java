@@ -1,8 +1,6 @@
-import java.io.IOException;
-import java.util.Map;
-import java.util.LinkedHashMap;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpExchange;
+import java.io.*;
+import java.util.*;
+import com.sun.net.httpserver.*;
 
 /**
  * Um objeto da classe HttpServer construído com um objeto desta classe chama o

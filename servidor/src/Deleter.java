@@ -1,7 +1,5 @@
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import com.sun.net.httpserver.HttpExchange;
+import java.io.*;
+import com.sun.net.httpserver.*;
 
 /**
  * Handler que remove um cliente.

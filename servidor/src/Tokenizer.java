@@ -1,8 +1,7 @@
-import java.io.IOException;
-import java.io.OutputStream;
-import java.math.BigInteger;
-import java.security.MessageDigest;
-import com.sun.net.httpserver.HttpExchange;
+import java.io.*;
+import java.math.*;
+import java.security.*;
+import com.sun.net.httpserver.*;
 
 /**
  * Handler que cria um cliente e o mapeia para um token.

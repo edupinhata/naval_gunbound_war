@@ -1,8 +1,6 @@
-import java.util.Map;
-import java.util.Arrays;
-import java.io.IOException;
-import java.io.OutputStream;
-import com.sun.net.httpserver.HttpExchange;
+import java.io.*;
+import java.util.*;
+import com.sun.net.httpserver.*;
 
 /**
  * Handler que adiciona um canal de escuta a um cliente.

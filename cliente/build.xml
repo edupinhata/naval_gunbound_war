@@ -34,7 +34,7 @@
 		<mkdir dir="${doc.dir}"/>
 		<javadoc destdir="${doc.dir}">
 			<fileset dir="${src.dir}">
-				<include name="**"/>
+				<include name="**/*.java"/>
 			</fileset>
 		</javadoc>
 	</target>
