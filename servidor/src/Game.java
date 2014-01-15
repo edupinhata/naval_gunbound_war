@@ -14,8 +14,6 @@ public class Game {
 	protected ConcurrentHashMap<String, Client> clients =
 		new ConcurrentHashMap<String, Client>();
 
-	protected ConcurrentLinkedDeque<ConcurrentLinkedDeque<Client>> board = 
-		new ConcurrentLinkedDeque<ConcurrentLinkedDeque<Client>>();
 	/**
 	 * Cria um novo cliente e o mapeia, se já não existir.
 	 *
