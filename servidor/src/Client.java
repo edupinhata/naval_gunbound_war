@@ -31,6 +31,19 @@ public class Client {
 	}
 
 	/**
+	 * Wrapper para adicionar conexões de escuta ao cliente.
+	 * <p>
+	 * A conexão é mantida até que haja falha no envio de alguma mensagem.
+	 *
+	 * @param o A conexão.
+	 * @see #stream(String)
+	 */
+	public void addStream(OutputStream o)
+	{
+		streams.add(o);
+	}
+
+	/**
 	 * Envia uma mensagem para o cliente através de todas os seus canais de
 	 * escuta.
 	 * <p>
