@@ -6,6 +6,7 @@
 	<property name="build.dir" value="build"/>
 	<property name="classes.dir" value="${build.dir}/classes"/>
 	<property name="jar.file" value="${build.dir}/${ant.project.name}.jar"/>
+	<property name="doc.dir" value="doc"/>
 
 	<target name="clean">
 		<delete dir="${build.dir}"/>
@@ -26,6 +27,16 @@
 
 	<target name="run">
 		<java fork="true" jar="${jar.file}"/>
+	</target>
+
+	<target name="doc">
+		<delete dir="${doc.dir}"/>
+		<mkdir dir="${doc.dir}"/>
+		<javadoc destdir="${doc.dir}">
+			<fileset dir="${src.dir}">
+				<include name="**"/>
+			</fileset>
+		</javadoc>
 	</target>
 
 </project>
