@@ -59,6 +59,7 @@ class Client {
 			} finally {
 				continue;
 			}
+		return true;
 	}
 
 	/**

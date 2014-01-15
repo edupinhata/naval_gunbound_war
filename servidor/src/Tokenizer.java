@@ -49,7 +49,7 @@ public class Tokenizer extends Handler {
 		String t = getToken(e);
 		byte[] b = t.getBytes();
 
-		if (!Client.create(t));
+		if (!Client.create(t))
 			e.sendResponseHeaders(200, b.length);
 		else
 			e.sendResponseHeaders(201, b.length);
