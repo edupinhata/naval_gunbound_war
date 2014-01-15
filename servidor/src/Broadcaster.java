@@ -29,7 +29,7 @@ public class Broadcaster extends Handler {
 	@Override
 	protected void handlePost(HttpExchange e) throws IOException
 	{
-		Client.broadcast(getBody(e));
+		game.broadcast(getBody(e));
 
 		e.sendResponseHeaders(200, 0);
 		e.getResponseBody().close();

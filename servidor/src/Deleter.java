@@ -32,7 +32,7 @@ public class Deleter extends Handler {
 	@Override
 	public void handlePost(HttpExchange e) throws IOException
 	{
-		if (!Client.remove(getBody(e)))
+		if (!game.remove(getBody(e)))
 			e.sendResponseHeaders(404, 0);
 		else
 			e.sendResponseHeaders(200, 0);

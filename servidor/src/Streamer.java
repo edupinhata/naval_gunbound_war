@@ -46,7 +46,7 @@ public class Streamer extends Handler {
 			return;
 		}
 
-		if (!Client.addStream(t[0], o)) {
+		if (!game.addStream(t[0], o)) {
 			e.sendResponseHeaders(404, 0);
 			o.close();
 			return;
