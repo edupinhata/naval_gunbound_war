@@ -129,7 +129,7 @@ class Player(Resource):
     game = None
 
     def do_GET(self, handler):
-        handler.reply(self.attributes)
+        handler.reply(200, self.attributes)
 
     def do_PUT(self, handler):
         data = handler.read()

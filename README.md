@@ -1,46 +1,51 @@
-naval_gunbound_war
-==================
+# naval_gunbound_war
 
 Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribuído.
 
+# Dependências
 
-Testando o servidor
-=====================
+* `python3`
 
-* Dependências: `git` `ant` `curl`
+# API RESTful
 
-`sudo apt-get install git ant curl`
+## Recursos e Métodos
 
-* Atualizando o repositório se já tiver:
+### /game
 
-`git pull`
+#### GET
 
-* Se não tiver:
+#### POST
 
+##### Entrada
+
+* `name`: `string`
+
+###### Exemplo
+
+`{ "name": "foo" }`
+
+# Instruções
+
+## Clonar
+
+`sudo apt-get install git`
 `git clone https://github.com/edupinhata/naval_gunbound_war`
 
-* Compilar:
+## Atualizar
 
-* Compilar e rodar o servidor (bloqueia o terminal):
+`cd naval_gunbound_war`
+`git pull`
 
-`cd naval_gunbound_war/servidor`
+## Executar
 
-`ant && ant run`
+### Servidor
 
-* Criar um usuário no servidor (HTTP POST):
+`cd servidor`
+`./server``[porta]`
 
-`TOKEN=$(curl -d "" "localhost:8000/token")`
+### Cliente
 
-* Escutar mensagens direcionadas ao usuário do servidor (HTTP GET) (bloqueia o terminal):
-
-`curl "localhost:8000/stream?token=$TOKEN"`
-
-* Enviar mensagens para todos os usuários do servidor (HTTP POST):
-
-`curl -d "mensagem" "localhost:8000/broadcast"`
-
-RASCUNHO DO PROJETO
-==============================
+# RASCUNHO DO PROJETO
 
 Atributos dos barcos
 * mobilidade //quantos quadrados pode se movimenta
