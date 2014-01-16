@@ -16,27 +16,27 @@ Toda entrada/saída é um objeto JSON contendo atributos de um jogador.
 
 ```json
 {
-	"name": "",
-	"hp": "",
-	"position": {
-		"x": 0,
-		"y": 0,
-	},
-	"movement": {
-		"x": 0,
-		"y": 0,
-	},
-	"combat": {
-		"x": 0,
-		"y": 0,
-	},
-	"delete": false
+    "name": "",
+    "hp": "",
+    "position": {
+        "x": 0,
+        "y": 0,
+    },
+    "movement": {
+        "x": 0,
+        "y": 0,
+    },
+    "combat": {
+        "x": 0,
+        "y": 0,
+    },
+    "delete": false
 }
 ```
 
 ## Recursos e Métodos
 
-### /game
+### /game (POST)
 
 * POST
 
@@ -57,11 +57,33 @@ HTTP/1.0 201 Created
 Location: /game/abcdefghijklmnopqrstuvwxyz0123456789
 ```
 
- * Ver
+ * Ver:
 
-  * [/game/[token]](#/game/[token])
+  * [/game/[token]](#/gametoken)
 
 * GET
+
+ * Código de retorno: `200 OK`
+ * Atributos de saída: Todos
+
+Este método recebe a próxima atualização de atributos de qualquer jogador,
+incluindo adição ou remoção de jogadores. A requisição é bloqueada pelo servidor
+até que haja uma atualização. Isto permite *polling* pelos clientes, e espera-se
+que usem uma *thread* para continuamente solicitar e receber atualizações.
+
+ * Exemplo:
+
+  1. ```sh
+     $ while true; do curl --verbose localhost:8000/game; done
+     ```
+
+  2. ```sh
+     $ curl --data '{"name": "foo"}' localhost:8000/game
+     ```
+
+  1. ```sh
+     {"name": "foo", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+     ```
 
 ### /game/[token]
 
