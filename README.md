@@ -38,7 +38,7 @@ Toda entrada/saída é um objeto JSON contendo atributos de um jogador.
 
 ### /game
 
-1. POST
+* POST
 
  * Atributos de entrada: `name`
  * Código de retorno: `201 Created`
@@ -49,13 +49,17 @@ junto com o código de retorno.
 
 Exemplo:
 
-```json
+```sh
 $ curl --verbose --data '{"name": "foo"}' localhost:8000/game
 ...
 HTTP/1.0 201 Created
 ...
 Location: /game/abcdefghijklmnopqrstuvwxyz0123456789
 ```
+
+Ver: [/game/<token>](#/game/<token>)
+
+* GET
 
 # Instruções
 
