@@ -4,25 +4,58 @@ Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribu�
 
 # Dependências
 
-* `python3`
+* Python 3
 
 # API RESTful
+
+## Entradas e Saídas
+
+Toda entrada/saída é um objeto JSON contendo atributos de um jogador.
+
+### Exemplo
+
+```json
+{
+	"name": "",
+	"hp": "",
+	"position": {
+		"x": 0,
+		"y": 0,
+	},
+	"movement": {
+		"x": 0,
+		"y": 0,
+	},
+	"combat": {
+		"x": 0,
+		"y": 0,
+	},
+	"delete": false
+}
+```
 
 ## Recursos e Métodos
 
 ### /game
 
-#### GET
+1. POST
 
-#### POST
+ * Atributos de entrada: `name`
+ * Código de retorno: `201 Created`
 
-##### Entrada
+Cria um recurso no servidor correspondente a um jogador. É acessível através de
+`/game/<token>`, que é especificado no campo `Location` do cabeçalho de retorno,
+junto com o código de retorno.
 
-* `name`: `string`
+Exemplo:
 
-###### Exemplo
-
-`{ "name": "foo" }`
+```json
+$ curl --verbose --data '{"name": "foo"}' localhost:8000/game
+...
+HTTP/1.0 201 Created
+...
+Location: /game/abcdefghijklmnopqrstuvwxyz0123456789
+```
 
 # Instruções
 
