@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+
+import socketserver
+import http.server
+import threading
+import hashlib
+import json
+import sys
+import os
+
+class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
+
+    resources = {}
+
+    def add_resource(self, resource):
+        resource.server = self
+        self.resources[resource.path] = resource
+
+    def remove_resource(self, path):
+        if path in self.resources:
+            del self.resources[path]
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
+
+    def do_GET(self):
+        if self.path in self.server.resources:
+            self.server.resources[self.path].do_GET(self)
+        else:
+            self.reply(404)
+
+    def do_POST(self):
+        if self.path in self.server.resources:
+            self.server.resources[self.path].do_POST(self)
+        else:
+            self.reply(404)
+
+    def do_PUT(self):
+        if self.path in self.server.resources:
+            self.server.resources[self.path].do_PUT(self)
+        else:
+            self.reply(404)
+
+    def do_DELETE(self):
+        if self.path in self.server.resources:
+            self.server.resources[self.path].do_DELETE(self)
+        else:
+            self.reply(404)
+
+    def read(self):
+        try:
+            length = int(self.headers['Content-Length'])
+            string = self.rfile.read(length).decode('utf-8')
+            return json.loads(string)
+        except:
+            return {}
+
+    def reply(self, code=200, data=None, headers=[]):
+        try:
+            self.send_response(code)
+            for h in headers:
+                self.send_header(h[0], h[1])
+            self.end_headers()
+            if data:
+                self.wfile.write(bytes(json.dumps(data), 'utf-8'))
+        except:
+            pass
+
+
+class Resource(object):
+
+    path = ''
+    server = None
+
+    def do_GET(self, handler):
+        handler.reply(405)
+
+    def do_POST(self, handler):
+        handler.reply(405)
+
+    def do_PUT(self, handler):
+        handler.reply(405)
+
+    def do_DELETE(self, handler):
+        handler.reply(405)
+
+
+class Notifier(Resource):
+
+    listeners = {}
+
+    def do_GET(self, handler):
+        self.listeners[handler] = threading.Semaphore(0)
+        self.listeners[handler].acquire()
+
+    def notify(self, notification=None):
+        listeners = self.listeners
+        self.listeners = {}
+        for handler, lock in listeners.items():
+            handler.reply(200, notification)
+            lock.release()
+
+
+class Game(Notifier):
+
+    def do_POST(self, handler):
+        player = Player()
+        player.game = self
+        player.path = self.path + '/' + self.get_token()
+
+        attributes = handler.read()
+        if 'name' in attributes:
+            player.attributes['name'] = attributes['name']
+
+        handler.server.add_resource(player)
+        handler.reply(201, headers=[('Location', player.path)])
+
+        self.notify(player.attributes)
+
+    def get_token(self):
+        h = hashlib.md5()
+        h.update(os.urandom(4096))
+        return h.hexdigest()
+
+
+class Player(Resource):
+
+    attributes = {'name': '', 'hp': 10,
+                  'position': {'x': 0, 'y': 0},
+                  'movement': {'x': 0, 'y': 0},
+                  'combat': {'x': 0, 'y': 0}}
+    game = None
+
+    def do_GET(self, handler):
+        handler.reply(self.attributes)
+
+    def do_PUT(self, handler):
+        data = handler.read()
+
+        for field in ['name', 'hp', 'position', 'delete']:
+            if field in data:
+                del data[field]
+
+        self.update(data)
+        handler.reply(202)
+
+    def do_DELETE(self, handler):
+        self.die()
+        handler.reply(204)
+
+    def create(self, game, path, data):
+        player.game = self
+        player.path = self.path + '/' + self.get_token()
+
+        if 'name' in data:
+            player.attributes['name'] = data['name']
+
+        self.game.notify(player.attributes)
+
+    def update(self, data):
+        for key, value in data.items():
+            if key in self.attributes:
+                self.attributes[key] = value
+        self.game.notify(self.attributes)
+
+    def die(self):
+        self.attributes['delete'] = True
+        self.game.notify(self.attributes)
+        self.server.remove_resource(self.path)
+
+
+if __name__ == '__main__':
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 80
+    server = Server(('localhost', port), Handler)
+
+    game = Game()
+    game.path = '/game'
+    server.add_resource(game)
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.socket.close()
+
