@@ -104,18 +104,15 @@ class Notifier(Resource):
 class Game(Notifier):
 
     def do_POST(self, handler):
-        player = Player()
-        player.game = self
-        player.path = self.path + '/' + self.get_token()
+        data = handler.read()
+        path = self.path + '/' + self.get_token()
 
-        attributes = handler.read()
-        if 'name' in attributes:
-            player.attributes['name'] = attributes['name']
+        player = Player()
+        player.create(self, path, data)
 
         handler.server.add_resource(player)
         handler.reply(201, headers=[('Location', player.path)])
 
-        self.notify(player.attributes)
 
     def get_token(self):
         h = hashlib.md5()
@@ -149,13 +146,13 @@ class Player(Resource):
         handler.reply(204)
 
     def create(self, game, path, data):
-        player.game = self
-        player.path = self.path + '/' + self.get_token()
+        self.game = game
+        self.path = path
 
         if 'name' in data:
-            player.attributes['name'] = data['name']
+            self.attributes['name'] = data['name']
 
-        self.game.notify(player.attributes)
+        self.game.notify(self.attributes)
 
     def update(self, data):
         for key, value in data.items():
