@@ -44,10 +44,10 @@ Toda entrada/saída é um objeto JSON contendo atributos de um jogador.
  * Código de retorno: `201 Created`
 
 Cria um recurso no servidor correspondente a um jogador. É acessível através de
-`/game/<token>`, que é especificado no campo `Location` do cabeçalho de retorno,
+`/game/[token]`, que é especificado no campo `Location` do cabeçalho de retorno,
 junto com o código de retorno.
 
-Exemplo:
+ * Exemplo:
 
 ```sh
 $ curl --verbose --data '{"name": "foo"}' localhost:8000/game
@@ -57,9 +57,13 @@ HTTP/1.0 201 Created
 Location: /game/abcdefghijklmnopqrstuvwxyz0123456789
 ```
 
-Ver: [/game/<token>](#/game/<token>)
+ * Ver
+
+  * [/game/[token]](#/game/[token])
 
 * GET
+
+### /game/[token]
 
 # Instruções
 
