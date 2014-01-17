@@ -139,12 +139,11 @@ class Player(Resource):
 
     def do_PUT(self, handler):
         data = handler.read()
-
-        for field in ['name', 'hp', 'position', 'delete']:
+        for field in ['movement', 'combat']:
             if field in data:
-                del data[field]
+                self.attributes[field].update(data[field])
 
-        self.update(data)
+        self.game.notify(self.attributes)
         handler.reply(202)
 
     def do_DELETE(self, handler):
@@ -166,6 +165,7 @@ class Player(Resource):
                 self.attributes[field].update(data[field])
                 del data[field]
         self.attributes.update(data)
+
         self.game.notify(self.attributes)
 
     def die(self):
