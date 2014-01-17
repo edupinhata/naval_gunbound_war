@@ -10,18 +10,18 @@ import os
 
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
-    _resources = {}
+    resources = {}
 
     def add_resource(self, resource):
         resource.server = self
-        self._resources[resource.path] = resource
+        self.resources[resource.path] = resource
 
     def remove_resource(self, path):
-        if path in self._resources:
-            del self._resources[path]
+        if path in self.resources:
+            del self.resources[path]
 
     def get_resource(self, path):
-        return self._resources[path] if path in self._resources else Resource()
+        return self.resources[path] if path in self.resources else Resource()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
