@@ -1,7 +1,5 @@
 # naval_gunbound_war
 
-teste
-
 Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribuído.
 
 # Dependências
@@ -12,7 +10,9 @@ Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribu�
 
 ## Entradas e Saídas
 
-Toda entrada/saída é um objeto JSON contendo atributos de um jogador.
+Toda entrada/saída é um objeto JSON contendo um ou mais atributos pertencentes a
+um jogador. Estes atributos podem ser usados, dependendo do método, para
+adição, atualização ou remoção de jogadores no servidor.
 
 ### Exemplo
 
@@ -38,56 +38,93 @@ Toda entrada/saída é um objeto JSON contendo atributos de um jogador.
 
 ## Recursos e Métodos
 
-### /game (POST)
+### POST /game
 
-* POST
+Cria um recurso `[token]` no servidor correspondente a um jogador. É acessível
+através de `/game/[token]`, que é retornado no campo `Location` do cabeçalho
+HTTP de retorno.
 
- * Atributos de entrada: `name`
- * Código de retorno: `201 Created`
+* Atributos de entrada: `name`
+* Código de retorno: `201 Created`
 
-Cria um recurso no servidor correspondente a um jogador. É acessível através de
-`/game/[token]`, que é especificado no campo `Location` do cabeçalho de retorno,
-junto com o código de retorno.
-
- * Exemplo:
+#### Exemplo
 
 ```sh
-$ curl --verbose --data '{"name": "foo"}' localhost:8000/game
-...
-HTTP/1.0 201 Created
-...
-Location: /game/abcdefghijklmnopqrstuvwxyz0123456789
+$ curl --verbose --request POST --data '{"name": "foo"}' localhost:8000/game
+[...]
+< Location: /game/abcdef0123456789
 ```
 
- * Ver:
+### GET /game/[token]
 
-  * [/game/[token]](#/gametoken)
+Obtém os atributos correspondentes a um jogador.
 
-* GET
+* Código de retorno: `200 OK`
+* Atributos de saída: Todos
 
- * Código de retorno: `200 OK`
- * Atributos de saída: Todos
+#### Exemplo
+
+```sh
+$ curl --request GET localhost:8000/game/abcdef0123456789
+{"name": "foo", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+```
+
+### PUT /game/[token]
+
+Atualiza, do jogador, atributos passados como entrada.
+
+* Atributos de entrada: `movement` `combat`
+* Código de retorno: `202 OK`
+
+#### Exemplo
+
+```sh
+$ curl --request PUT --data '{"combat": {"x": 1, "y": -1}}' localhost:8000/game/abcdef0123456789
+$ curl --request GET localhost:8000/game/abcdef0123456789
+{"name": "foo", "combat": {"y": -1, "x": 1}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+```
+
+### GET /game
+
+* Código de retorno: `200 OK`
+* Atributos de saída: Todos
 
 Este método recebe a próxima atualização de atributos de qualquer jogador,
 incluindo adição ou remoção de jogadores. A requisição é bloqueada pelo servidor
-até que haja uma atualização. Isto permite *polling* pelos clientes, e espera-se
-que usem uma *thread* para continuamente solicitar e receber atualizações.
+até que haja uma atualização. Isto implementa *polling* no lado do servidor, e
+espera-se que usem *threads* para continuamente solicitar e receber atualizações
+(*streaming*).
 
- * Exemplo:
+#### Exemplo:
 
-  1. ```sh
-     $ while true; do curl --verbose localhost:8000/game; done
-     ```
+1. ```sh
+   $ while true; do curl --request GET localhost:8000/game; done
+   ```
 
-  2. ```sh
-     $ curl --data '{"name": "foo"}' localhost:8000/game
-     ```
+2. ```sh
+   $ curl --request POST --data '{"name": "foo"}' localhost:8000/game
+   $ curl --request POST --data '{"name": "bar"}' localhost:8000/game
+   $ curl --request PUT --data '{"combat": {"x": 1, "y": -1}}' localhost:8000/game/abcdef0123456789
+   ```
 
-  1. ```sh
-     {"name": "foo", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
-     ```
+1. ```sh
+   {"name": "foo", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+   {"name": "bar", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+   {"name": "foo", "combat": {"y": 1, "x": -1}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+   ```
 
-### /game/[token]
+### DELETE /game/[token]
+
+Remove do servidor o recurso que representa o jogador.
+
+#### Exemplo
+
+```sh
+$ curl --request DELETE localhost:8000/game/abcdef0123456789
+$ curl --verbose --request GET localhost:8000/game/abcdef0123456789
+[...]
+< HTTP/1.0 404 Not Found
+```
 
 # Instruções
 
@@ -109,6 +146,8 @@ que usem uma *thread* para continuamente solicitar e receber atualizações.
 `./server``[porta]`
 
 ### Cliente
+
+Ainda não implementado.
 
 # RASCUNHO DO PROJETO
 
