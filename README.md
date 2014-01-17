@@ -131,11 +131,13 @@ $ curl --verbose --request GET localhost:8000/game/abcdef0123456789
 ## Clonar
 
 `sudo apt-get install git`
+
 `git clone https://github.com/edupinhata/naval_gunbound_war`
 
 ## Atualizar
 
 `cd naval_gunbound_war`
+
 `git pull`
 
 ## Executar
@@ -143,7 +145,8 @@ $ curl --verbose --request GET localhost:8000/game/abcdef0123456789
 ### Servidor
 
 `cd servidor`
-`./server``[porta]`
+
+`./server [porta]`
 
 ### Cliente
 
