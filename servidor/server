@@ -10,42 +10,33 @@ import os
 
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
-    resources = {}
+    _resources = {}
 
     def add_resource(self, resource):
         resource.server = self
-        self.resources[resource.path] = resource
+        self._resources[resource.path] = resource
 
     def remove_resource(self, path):
-        if path in self.resources:
-            del self.resources[path]
+        if path in self._resources:
+            del self._resources[path]
+
+    def get_resource(self, path):
+        return self._resources[path] if path in self._resources else Resource()
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
-        if self.path in self.server.resources:
-            self.server.resources[self.path].do_GET(self)
-        else:
-            self.reply(404)
+        self.server.get_resource(self.path).do_GET(self)
 
     def do_POST(self):
-        if self.path in self.server.resources:
-            self.server.resources[self.path].do_POST(self)
-        else:
-            self.reply(404)
+        self.server.get_resource(self.path).do_POST(self)
 
     def do_PUT(self):
-        if self.path in self.server.resources:
-            self.server.resources[self.path].do_PUT(self)
-        else:
-            self.reply(404)
+        self.server.get_resource(self.path).do_PUT(self)
 
     def do_DELETE(self):
-        if self.path in self.server.resources:
-            self.server.resources[self.path].do_DELETE(self)
-        else:
-            self.reply(404)
+        self.server.get_resource(self.path).do_DELETE(self)
 
     def read(self):
         try:
@@ -73,16 +64,22 @@ class Resource(object):
     server = None
 
     def do_GET(self, handler):
-        handler.reply(405)
+        self.default_reply(handler)
 
     def do_POST(self, handler):
-        handler.reply(405)
+        self.default_reply(handler)
 
     def do_PUT(self, handler):
-        handler.reply(405)
+        self.default_reply(handler)
 
     def do_DELETE(self, handler):
-        handler.reply(405)
+        self.default_reply(handler)
+
+    def default_reply(self, handler):
+        if not self.server:
+            handler.reply(404)
+        else:
+            handler.reply(405)
 
 
 class Notifier(Resource):
