@@ -11,8 +11,8 @@ Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribu�
 ## Entradas e Saídas
 
 Toda entrada/saída é um objeto JSON contendo um ou mais atributos pertencentes a
-um jogador. Estes atributos podem ser usados, dependendo do método, para
-adição, atualização ou remoção de jogadores no servidor.
+um jogador. Estes atributos podem ser usados, dependendo do método, para adição,
+atualização ou remoção de jogadores no servidor.
 
 ### Exemplo
 
@@ -74,7 +74,7 @@ $ curl --request GET localhost:8000/game/abcdef0123456789
 Atualiza, do jogador, atributos passados como entrada.
 
 * Atributos de entrada: `movement` `combat`
-* Código de retorno: `202 OK`
+* Código de retorno: `202 Accepted`
 
 #### Exemplo
 
@@ -89,13 +89,13 @@ $ curl --request GET localhost:8000/game/abcdef0123456789
 * Código de retorno: `200 OK`
 * Atributos de saída: Todos
 
-Este método recebe a próxima atualização de atributos de qualquer jogador,
+Este método acessa a próxima atualização de atributos de qualquer jogador,
 incluindo adição ou remoção de jogadores. A requisição é bloqueada pelo servidor
-até que haja uma atualização. Isto implementa *polling* no lado do servidor, e
-espera-se que usem *threads* para continuamente solicitar e receber atualizações
-(*streaming*).
+até que haja uma atualização, efetivamente implementando *polling* no lado do
+servidor. Espera-se que clientes continuamente solicitem (através de por exemplo
+*threads*) este recurso para se atualizarem.
 
-#### Exemplo:
+#### Exemplo
 
 1. ```sh
    $ while true; do curl --request GET localhost:8000/game; done
@@ -148,21 +148,4 @@ $ curl --verbose --request GET localhost:8000/game/abcdef0123456789
 ### Cliente
 
 Ainda não implementado.
-
-# RASCUNHO DO PROJETO
-
-Atributos dos barcos
-* mobilidade //quantos quadrados pode se movimenta
-* vida //quanto de dano ele resiste
-* itens //armas, escudos, itens de reparo
-* tamanho do barco //comprimento do barco. Inicialmente de 1 a 5 quadrados
-* orientação // se o barco está na orizontal ou vertical
-
-
-
-Itens
-- espaço //quanto de espaço ocupa no barco
-ativar(); //se for uma arma, atira, se for um item de recuperação, recupera
-
-Armas
 
