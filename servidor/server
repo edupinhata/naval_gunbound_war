@@ -113,7 +113,6 @@ class Game(Notifier):
         handler.server.add_resource(player)
         handler.reply(201, headers=[('Location', player.path)])
 
-
     def get_token(self):
         h = hashlib.md5()
         h.update(os.urandom(4096))
@@ -122,10 +121,12 @@ class Game(Notifier):
 
 class Player(Resource):
 
-    attributes = {'name': '', 'hp': 10,
+    attributes = {'name': '',
+                  'hp': 10,
                   'position': {'x': 0, 'y': 0},
                   'movement': {'x': 0, 'y': 0},
-                  'combat': {'x': 0, 'y': 0}}
+                  'combat': {'x': 0, 'y': 0},
+                  'delete': False}
     game = None
 
     def do_GET(self, handler):
@@ -155,9 +156,11 @@ class Player(Resource):
         self.game.notify(self.attributes)
 
     def update(self, data):
-        for key, value in data.items():
-            if key in self.attributes:
-                self.attributes[key] = value
+        for field in ['position', 'movement', 'combat']:
+            if field in data:
+                self.attributes[field].update(data[field])
+                del data[field]
+        self.attributes.update(data)
         self.game.notify(self.attributes)
 
     def die(self):
