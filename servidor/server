@@ -176,11 +176,14 @@ class Player(Resource):
 class Worker(threading.Thread):
 
     game = None
+    step = 0.25
 
     def run():
         while True:
-            players = server.
-            pass
+            time.sleep(0.25)
+            for p in game.get_players():
+                p.attributes['position']['x'] += p.attributes['movement']['x']
+                p.attributes['position']['y'] += p.attributes['movement']['y']
 
 
 if __name__ == '__main__':
@@ -192,7 +195,7 @@ if __name__ == '__main__':
     server.add_resource(game)
 
     worker = Worker()
-    worker.server = server
+    worker.game = game
     worker.start()
 
     try:
