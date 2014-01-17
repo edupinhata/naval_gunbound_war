@@ -117,6 +117,8 @@ servidor. Espera-se que clientes continuamente solicitem (através de por exempl
 
 Remove do servidor o recurso que representa o jogador.
 
+* Código de retorno: `204 No Content`
+
 #### Exemplo
 
 ```sh
