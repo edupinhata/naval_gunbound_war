@@ -159,14 +159,15 @@ class Player(Resource):
 
         self.game.notify(self.attributes)
 
-    def update(self, data):
-        for field in ['position', 'movement', 'combat']:
-            if field in data:
-                self.attributes[field].update(data[field])
-                del data[field]
-        self.attributes.update(data)
-
-        self.game.notify(self.attributes)
+    def update(self):
+        changes = False
+        for i in ['x', 'y']:
+            delta = self.attributes['movement'][i]
+            if delta != 0:
+                self.attributes['position'][i] += delta
+                changes = True
+        if changes:
+            self.game.notify(self.attributes)
 
     def die(self):
         self.attributes['delete'] = True
@@ -177,14 +178,13 @@ class Player(Resource):
 class Worker(threading.Thread):
 
     game = None
-    step = 0.25
+    step = 0
 
     def run(self):
         while True:
             time.sleep(0.25)
             for p in game.get_players():
-                p.attributes['position']['x'] += p.attributes['movement']['x']
-                p.attributes['position']['y'] += p.attributes['movement']['y']
+                p.update()
 
 
 if __name__ == '__main__':
@@ -197,6 +197,7 @@ if __name__ == '__main__':
 
     worker = Worker()
     worker.game = game
+    worker.step = 0.25
     worker.start()
 
     try:
