@@ -87,15 +87,15 @@ class Notifier(Resource):
     listeners = {}
 
     def do_GET(self, handler):
-        self.listeners[handler] = threading.Semaphore(0)
-        self.listeners[handler].acquire()
+        self.listeners[handler] = threading.Event()
+        self.listeners[handler].wait()
 
     def notify(self, notification=None):
         listeners = self.listeners
         self.listeners = {}
-        for handler, lock in listeners.items():
+        for handler, event in listeners.items():
             handler.reply(200, notification)
-            lock.release()
+            event.set()
 
 
 class Game(Notifier):
