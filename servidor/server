@@ -5,6 +5,7 @@ import http.server
 import threading
 import hashlib
 import json
+import time
 import sys
 import os
 
@@ -178,7 +179,7 @@ class Worker(threading.Thread):
     game = None
     step = 0.25
 
-    def run():
+    def run(self):
         while True:
             time.sleep(0.25)
             for p in game.get_players():
