@@ -123,7 +123,6 @@ class Game(Notifier):
         data = handler.read()
 
         player = Player(self, path, data)
-        self.server.add_resource(player)
 
         handler.reply(201, headers=[('Location', player.path)])
 
