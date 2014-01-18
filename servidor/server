@@ -157,14 +157,14 @@ class Player(Resource):
         handler.reply(204)
 
     def update(self):
-        changes = False
-        for i in ['x', 'y']:
-            delta = self.attributes['movement'][i]
-            if delta != 0:
-                self.attributes['position'][i] += delta
-                changes = True
-        if changes:
-            self.game.notify(self.attributes)
+        current = self.attributes['position']
+        delta = self.attributes['movement']
+        future = {k: current[k] + delta[k] for k in current}
+        if current == future:
+            return
+
+        self.attributes['position'] = future
+        self.game.notify(self.attributes)
 
     def die(self):
         self.attributes['delete'] = True
