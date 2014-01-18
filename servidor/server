@@ -11,10 +11,11 @@ import os
 
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
-    resources = {}
+    def __init__(self, address, port):
+        http.server.HTTPServer.__init__(self, (address, port), Handler)
+        self.resources = {}
 
     def add_resource(self, resource):
-        resource.server = self
         self.resources[resource.path] = resource
 
     def remove_resource(self, path):
@@ -25,8 +26,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
         return self.resources[path] if path in self.resources else Resource()
 
     def get_resources(self, path):
-        resources = self.resources.copy()
-        return [resources[x] for x in resources if path in x]
+        return [self.resources[x] for x in self.resources if path in x]
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -65,31 +65,30 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class Resource(object):
 
-    path = ''
-    server = None
+    def __init__(self, path, server, default_reply=405):
+        self.path = path
+        self.server = server
+        self.server.add_resource(self)
+        self.default_reply = default_reply
 
     def do_GET(self, handler):
-        self.default_reply(handler)
+        handler.reply(self.default_reply)
 
     def do_POST(self, handler):
-        self.default_reply(handler)
+        handler.reply(self.default_reply)
 
     def do_PUT(self, handler):
-        self.default_reply(handler)
+        handler.reply(self.default_reply)
 
     def do_DELETE(self, handler):
-        self.default_reply(handler)
-
-    def default_reply(self, handler):
-        if not self.server:
-            handler.reply(404)
-        else:
-            handler.reply(405)
+        handler.reply(self.default_reply)
 
 
 class Notifier(Resource):
 
-    listeners = {}
+    def __init__(self, path, server):
+        Resource.__init__(self, path, server)
+        self.listeners = {}
 
     def do_GET(self, handler):
         self.listeners[handler] = threading.Event()
@@ -105,12 +104,16 @@ class Notifier(Resource):
 
 class Game(Notifier):
 
+    def __init__(self, path, server):
+        Notifier.__init__(self, path, server)
+        self.players = {}
+        self.board = {}
+
     def do_POST(self, handler):
         data = handler.read()
         path = self.path + '/' + self.get_token()
 
-        player = Player()
-        player.create(self, path, data)
+        player = Player(self, path, data)
 
         handler.server.add_resource(player)
         handler.reply(201, headers=[('Location', player.path)])
@@ -126,13 +129,16 @@ class Game(Notifier):
 
 class Player(Resource):
 
-    attributes = {'name': '',
-                  'hp': 10,
-                  'position': {'x': 0, 'y': 0},
-                  'movement': {'x': 0, 'y': 0},
-                  'combat': {'x': 0, 'y': 0},
-                  'delete': False}
-    game = None
+    def __init__(self, game, path, data):
+        Resource.__init__(self, path, game.server)
+        self.game = game
+        self.attributes = {'name': data['name'] if 'name' in data else '',
+                           'hp': 10,
+                           'position': {'x': 0, 'y': 0},
+                           'movement': {'x': 0, 'y': 0},
+                           'combat': {'x': 0, 'y': 0},
+                           'delete': False}
+        self.game.notify(self.attributes)
 
     def do_GET(self, handler):
         handler.reply(data=self.attributes)
@@ -149,15 +155,6 @@ class Player(Resource):
     def do_DELETE(self, handler):
         self.die()
         handler.reply(204)
-
-    def create(self, game, path, data):
-        self.game = game
-        self.path = path
-
-        if 'name' in data:
-            self.attributes['name'] = data['name']
-
-        self.game.notify(self.attributes)
 
     def update(self):
         changes = False
@@ -177,27 +174,24 @@ class Player(Resource):
 
 class Worker(threading.Thread):
 
-    game = None
-    step = 0
+    def __init__(self, game, step):
+        threading.Thread.__init__(self)
+        self.game = game
+        self.step = step
 
     def run(self):
         while True:
-            time.sleep(step)
+            time.sleep(self.step)
             for p in game.get_players():
                 p.update()
 
 
 if __name__ == '__main__':
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 80
-    server = Server(('localhost', port), Handler)
+    server = Server('localhost', int(sys.argv[1]) if len(sys.argv) > 1 else 80)
 
-    game = Game()
-    game.path = '/game'
-    server.add_resource(game)
+    game = Game('/game', server)
 
-    worker = Worker()
-    worker.game = game
-    worker.step = 0.25
+    worker = Worker(game, 0.25)
     worker.start()
 
     try:
