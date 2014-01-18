@@ -2,6 +2,7 @@
 
 import socketserver
 import http.server
+import collections
 import threading
 import hashlib
 import json
@@ -68,11 +69,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class Resource(object):
 
-    def __init__(self, path, server, default_reply=405):
+    def __init__(self, path=None, server=None, default_reply=405):
         self.path = path
 
         self.server = server
-        self.server.add_resource(self)
+        if self.server:
+            self.server.add_resource(self)
 
         self.default_reply = default_reply
 
@@ -120,7 +122,7 @@ class Game(Notifier):
         data = handler.read()
 
         player = Player(self, path, data)
-        handler.server.add_resource(player)
+        self.server.add_resource(player)
 
         handler.reply(201, headers=[('Location', player.path)])
 
@@ -138,6 +140,7 @@ class Player(Resource):
     def __init__(self, game, path, data):
         Resource.__init__(self, path, game.server)
         self.game = game
+        self.game.players[path] = self
         self.attributes = {'name': data['name'] if 'name' in data else '',
                            'hp': 10,
                            'position': {'x': 0, 'y': 0},
@@ -176,6 +179,7 @@ class Player(Resource):
         self.attributes['delete'] = True
         self.game.notify(self.attributes)
 
+        del self.game.players[self.path]
         self.server.remove_resource(self.path)
 
 
