@@ -47,6 +47,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         try:
             length = int(self.headers['Content-Length'])
             string = self.rfile.read(length).decode('utf-8')
+
             return json.loads(string)
         except:
             return {}
@@ -54,9 +55,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def reply(self, code=200, data=None, headers=[]):
         try:
             self.send_response(code)
+
             for h in headers:
                 self.send_header(h[0], h[1])
             self.end_headers()
+
             if data:
                 self.wfile.write(bytes(json.dumps(data), 'utf-8'))
         except:
@@ -67,8 +70,10 @@ class Resource(object):
 
     def __init__(self, path, server, default_reply=405):
         self.path = path
+
         self.server = server
         self.server.add_resource(self)
+
         self.default_reply = default_reply
 
     def do_GET(self, handler):
@@ -97,6 +102,7 @@ class Notifier(Resource):
     def notify(self, notification=None):
         listeners = self.listeners
         self.listeners = {}
+
         for handler, event in listeners.items():
             handler.reply(data=notification)
             event.set()
@@ -110,12 +116,12 @@ class Game(Notifier):
         self.board = {}
 
     def do_POST(self, handler):
-        data = handler.read()
         path = self.path + '/' + self.get_token()
+        data = handler.read()
 
         player = Player(self, path, data)
-
         handler.server.add_resource(player)
+
         handler.reply(201, headers=[('Location', player.path)])
 
     def get_token(self):
@@ -169,6 +175,7 @@ class Player(Resource):
     def die(self):
         self.attributes['delete'] = True
         self.game.notify(self.attributes)
+
         self.server.remove_resource(self.path)
 
 
