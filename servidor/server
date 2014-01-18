@@ -15,6 +15,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
     def __init__(self, address, port):
         http.server.HTTPServer.__init__(self, (address, port), Handler)
         self.resources = {}
+        self.notfound = Resource(default_reply=404)
 
     def add_resource(self, resource):
         self.resources[resource.path] = resource
@@ -24,7 +25,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
             del self.resources[path]
 
     def get_resource(self, path):
-        return self.resources[path] if path in self.resources else Resource()
+        return self.resources[path] if path in self.resources else self.notfound
 
     def get_resources(self, path):
         return [self.resources[x] for x in self.resources if path in x]
