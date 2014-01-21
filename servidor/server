@@ -2,7 +2,6 @@
 
 import socketserver
 import http.server
-import collections
 import threading
 import hashlib
 import json
@@ -14,36 +13,35 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
     def __init__(self, address, port):
         http.server.HTTPServer.__init__(self, (address, port), Handler)
-        self.resources = {}
-        self.notfound = Resource(default_reply=404)
+        self.root = Resource()
+        self.not_found = Resource({'code': 404})
 
-    def add_resource(self, resource):
-        self.resources[resource.path] = resource
+    def find_resource(self, path):
+        path_list = path.split('/')
+        path_list.pop(0)
 
-    def remove_resource(self, path):
-        if path in self.resources:
-            del self.resources[path]
+        res = self.root
+        for child in path_list:
+            if child not in res.children:
+                return self.not_found
+            res = res.children[child]
 
-    def get_resource(self, path):
-        return self.resources[path] if path in self.resources else self.notfound
-
-    def get_resources(self, path):
-        return [self.resources[x] for x in self.resources if path in x]
+        return res
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
-        self.server.get_resource(self.path).do_GET(self)
+        self.reply(self.server.find_resource(self.path).do_GET(self.read()))
 
     def do_POST(self):
-        self.server.get_resource(self.path).do_POST(self)
+        self.reply(self.server.find_resource(self.path).do_POST(self.read()))
 
     def do_PUT(self):
-        self.server.get_resource(self.path).do_PUT(self)
+        self.reply(self.server.find_resource(self.path).do_PUT(self.read()))
 
     def do_DELETE(self):
-        self.server.get_resource(self.path).do_DELETE(self)
+        self.reply(self.server.find_resource(self.path).do_DELETE(self.read()))
 
     def read(self):
         try:
@@ -54,156 +52,164 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except:
             return {}
 
-    def reply(self, code=200, data=None, headers=[]):
+    def reply(self, args={}):
         try:
-            self.send_response(code)
+            response = {'code': 200, 'headers': [], 'data': None}
+            response.update(args)
 
-            for h in headers:
+            self.send_response(response['code'])
+
+            for h in response['headers']:
                 self.send_header(h[0], h[1])
             self.end_headers()
 
-            if data:
-                self.wfile.write(bytes(json.dumps(data), 'utf-8'))
+            if response['data']:
+                self.wfile.write(bytes(json.dumps(response['data']), 'utf-8'))
         except:
             pass
 
 
 class Resource(object):
 
-    def __init__(self, path=None, server=None, default_reply=405):
-        self.path = path
-
-        self.server = server
-        if self.server:
-            self.server.add_resource(self)
-
+    def __init__(self, default_reply={'code': 405}):
         self.default_reply = default_reply
 
-    def do_GET(self, handler):
-        handler.reply(self.default_reply)
+        self.path = ''
+        self.children = {}
+        self.delete_event = threading.Event()
 
-    def do_POST(self, handler):
-        handler.reply(self.default_reply)
+    def do_GET(self, data):
+        return self.default_reply
 
-    def do_PUT(self, handler):
-        handler.reply(self.default_reply)
+    def do_POST(self, data):
+        return self.default_reply
 
-    def do_DELETE(self, handler):
-        handler.reply(self.default_reply)
+    def do_PUT(self, data):
+        return self.default_reply
+
+    def do_DELETE(self, data):
+        return self.default_reply
+
+    def add_child(self, path, resource):
+        self.children[path] = resource
+        resource.path = self.path + '/' + path
+
+        threading.Thread(target=self.wait_delete,
+                kwargs={'path': path}).start()
+
+    def wait_delete(self, path):
+        resource = self.children[path]
+        resource.delete_event.wait()
+        del self.children[path]
 
 
 class Notifier(Resource):
 
-    def __init__(self, path, server):
-        Resource.__init__(self, path, server)
-        self.listeners = {}
+    def __init__(self):
+        Resource.__init__(self)
+        self.listeners = []
 
-    def do_GET(self, handler):
-        self.listeners[handler] = threading.Event()
-        self.listeners[handler].wait()
+    def do_GET(self, data):
+        request = {'event': threading.Event(), 'reply':{}}
 
-    def notify(self, notification=None):
+        self.listeners += [request]
+        request['event'].wait()
+
+        return {'code': 200, 'data': request['reply']}
+
+    def notify(self, data={}):
         listeners = self.listeners
-        self.listeners = {}
+        self.listeners = []
 
-        for handler, event in listeners.items():
-            handler.reply(data=notification)
-            event.set()
+        for request in listeners:
+            request['reply'] = data
+            request['event'].set()
 
 
-class Game(Notifier):
+class Game(Notifier, threading.Thread):
 
-    def __init__(self, path, server):
-        Notifier.__init__(self, path, server)
-        self.players = {}
-        self.board = {}
+    def __init__(self, step):
+        Notifier.__init__(self)
+        threading.Thread.__init__(self)
+        self.step = step
 
-    def do_POST(self, handler):
-        path = self.path + '/' + self.get_token()
-        data = handler.read()
+    def do_POST(self, data):
+        if 'name' not in data:
+            return {'code': 403} # TODO achar código melhor
 
-        player = Player(self, path, data)
+        p = Player(data)
+        self.add_child(self.get_token(), p)
+        p.update_event.set()
 
-        handler.reply(201, headers=[('Location', player.path)])
+        return {'code': 201, 'headers': [('Location', p.path)]}
 
     def get_token(self):
         h = hashlib.md5()
         h.update(os.urandom(4096))
         return h.hexdigest()
 
-    def get_players(self):
-        return self.server.get_resources(self.path + '/')
+    def add_child(self, path, resource):
+        Resource.add_child(self, path, resource)
+        threading.Thread(target=self.wait_update,
+                kwargs={'path': path}).start()
+
+    def wait_update(self, path):
+        player = self.children[path]
+        while True:
+            player.update_event.wait()
+            player.update_event.clear()
+            self.notify(player.attributes)
+
+    def run(self):
+        while True:
+            time.sleep(self.step)
+            for p in game.children.values():
+                pass # TODO lógica do jogo aqui
 
 
 class Player(Resource):
 
-    def __init__(self, game, path, data):
-        Resource.__init__(self, path, game.server)
-        self.game = game
-        self.game.players[path] = self
-        self.attributes = {'name': data['name'] if 'name' in data else '',
+    def __init__(self, data):
+        Resource.__init__(self)
+        self.update_event = threading.Event()
+        self.attributes = {'name': data['name'],
                            'hp': 10,
                            'position': {'x': 0, 'y': 0},
                            'movement': {'x': 0, 'y': 0},
                            'combat': {'x': 0, 'y': 0},
                            'delete': False}
-        self.game.notify(self.attributes)
 
-    def do_GET(self, handler):
-        handler.reply(data=self.attributes)
+    def do_GET(self, data):
+        return {'code': 200, 'data': self.attributes}
 
-    def do_PUT(self, handler):
-        data = handler.read()
+    def do_PUT(self, data):
+        # TODO validar dados
         for field in ['movement', 'combat']:
             if field in data:
                 self.attributes[field].update(data[field])
+        self.update_event.set()
 
-        self.game.notify(self.attributes)
-        handler.reply(202)
+        return {'code': 202}
 
-    def do_DELETE(self, handler):
+    def do_DELETE(self, data):
         self.die()
-        handler.reply(204)
+        return {'code': 204}
 
-    def update(self):
-        current = self.attributes['position']
-        delta = self.attributes['movement']
-        future = {k: current[k] + delta[k] for k in current}
-        if current == future:
-            return
-
-        self.attributes['position'] = future
-        self.game.notify(self.attributes)
+    def update(self, data):
+        pass # TODO
 
     def die(self):
         self.attributes['delete'] = True
-        self.game.notify(self.attributes)
-
-        del self.game.players[self.path]
-        self.server.remove_resource(self.path)
-
-
-class Worker(threading.Thread):
-
-    def __init__(self, game, step):
-        threading.Thread.__init__(self)
-        self.game = game
-        self.step = step
-
-    def run(self):
-        while True:
-            time.sleep(self.step)
-            for p in game.get_players():
-                p.update()
+        self.update_event.set()
+        self.delete_event.set()
 
 
 if __name__ == '__main__':
     server = Server('localhost', int(sys.argv[1]) if len(sys.argv) > 1 else 80)
 
-    game = Game('/game', server)
-
-    worker = Worker(game, 0.25)
-    worker.start()
+    game = Game(0.25)
+    server.root.add_child('game', game)
+    game.start()
 
     try:
         server.serve_forever()
