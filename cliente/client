@@ -1,20 +1,77 @@
 #!/usr/bin/env python3
 
 import http.client
+import threading
+import json
+import sys
 
-connection = http.client.HTTPConnection('localhost', 8000)
 
-connection.request('GET', '/game')
-response = connection.getresponse()
+class Game():
 
-def mread(stream):
-    return stream.read().decode('utf-8')
+    def __init__(self, host, script):
+        self.host = host
+        self.script = script
 
-try:
-    while not response.closed:
-        print(mread(response))
-except:
-    response.close()
-finally:
-    connection.close()
+        self.location = None
+        self.attributes = {}
+        self.script_data = {}
+        self.players = {}
+
+        self.listener = http.client.HTTPConnection(host)
+
+    def request(self, method, resource, data=None):
+        c = http.client.HTTPConnection(self.host)
+        c.request(method, resource, json.dumps(data))
+        return c.getresponse()
+
+    def create(self, data):
+        response = self.request('POST', '/game', data)
+        self.location = response.getheader('Location')
+
+        response = self.request('GET', self.location)
+        self.attributes = json.loads(response.read().decode('utf-8'))
+
+        print("Welcome,", self.attributes['name'])
+
+    def listen(self):
+        while True:
+            response = self.request('GET', '/game')
+            update = json.loads(response.read().decode('utf-8'))
+
+            print("Recebida atualização:", update)
+            threading.Thread(target=self.update,
+                    kwargs={'data': update}).start()
+
+
+    def update(self, data):
+        if data['name'] is self.attributes['name']:
+            self.attributes = data
+        else:
+            self.players['name'] = data
+
+        self.execute()
+
+    def execute(self):
+        script = open(self.script)
+        string = script.read()
+        script.close()
+
+        attributes = self.attributes.copy()
+        players = self.players.copy()
+        exec(string, {
+            '__builtins__': None,
+            'script_data': self.script_data,
+            'attributes': attributes,
+            'players': players,
+            })
+
+        if attributes != self.attributes:
+            self.request('PUT', self.location, attributes).read()
+
+
+if __name__ == "__main__":
+    if not len(sys.argv) < 4:
+        game = Game(sys.argv[1], sys.argv[2])
+        game.create({'name': sys.argv[3]})
+        game.listen()
 
