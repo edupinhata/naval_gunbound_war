@@ -13,6 +13,7 @@ import os
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
     def __init__(self, address, port):
+        socketserver.ThreadingMixIn.__init__(self)
         http.server.HTTPServer.__init__(self, (address, port), Handler)
         self.root = Resource()
         self.not_found = Resource({'code': 404})
@@ -135,16 +136,17 @@ class Game(Notifier, threading.Thread):
         self.step = step
 
     def do_POST(self, data):
+        # TODO códigos melhores
         if 'name' not in data:
-            return {'code': 403} # TODO achar código melhor
+            return {'code': 403}
+        for p in self.children.values():
+            if data['name'] == p.attributes['name']:
+                return {'code': 403}
 
-        public_token = self.get_token()
-        private_token = self.get_token()
-
-        data.update({'id': public_token})
         p = Player(data)
+        token = self.get_token()
+        self.add_child(token, p)
 
-        self.add_child(private_token, p)
         p.update_event.set()
 
         return {'code': 201, 'headers': [('Location', p.path)]}
@@ -170,7 +172,8 @@ class Game(Notifier, threading.Thread):
         while True:
             time.sleep(self.step)
             for p in game.children.values():
-                pass # TODO lógica do jogo aqui
+                p.update({})
+                # TODO lógica do jogo aqui
 
 
 class Player(Resource):
@@ -184,7 +187,7 @@ class Player(Resource):
             'position': {'x': 0, 'y': 0},
             'movement': {'x': 0, 'y': 0},
             'combat': {'x': 0, 'y': 0},
-            'delete': False}
+            'delete': False
             })
 
     def do_GET(self, data):
@@ -195,7 +198,6 @@ class Player(Resource):
         for field in ['movement', 'combat']:
             if field in data:
                 self.attributes[field].update(data[field])
-        self.update_event.set()
 
         return {'code': 202}
 
@@ -204,7 +206,8 @@ class Player(Resource):
         return {'code': 204}
 
     def update(self, data):
-        pass # TODO
+        self.update_event.set()
+        # TODO
 
     def die(self):
         self.attributes['delete'] = True
