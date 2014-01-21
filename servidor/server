@@ -2,6 +2,7 @@
 
 import socketserver
 import http.server
+import http.client
 import email.utils
 import threading
 import hashlib
@@ -43,12 +44,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_PUT(self):
         self.reply(self.server.find_resource(self.path).do_PUT(self.read()))
 
-    def do_DELETE(self):
-        self.reply(self.server.find_resource(self.path).do_DELETE(self.read()))
-
     def read(self):
         data = {'timestamp': self.get_timestamp()}
-        print(self.get_timestamp())
         try:
             length = int(self.headers['Content-Length'])
             string = self.rfile.read(length).decode('utf-8')
@@ -60,7 +57,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def reply(self, args={}):
         try:
-            response = {'code': 200, 'headers': [], 'data': None}
+            response = {'code': http.client.OK, 'headers': [], 'data': None}
             response.update(args)
 
             self.send_response(response['code'])
@@ -99,9 +96,6 @@ class Resource(object):
     def do_PUT(self, data):
         return self.default_reply
 
-    def do_DELETE(self, data):
-        return self.default_reply
-
     def add_child(self, path, resource):
         self.children[path] = resource
         threading.Thread(target=self.wait_for_delete,
@@ -122,9 +116,9 @@ class Notifier(Resource):
 
     def do_GET(self, data):
         t = 'timestamp'
-        if t in data and data[t] < self.timestamp:
+        if t in data and data[t] > self.timestamp:
             self.update_event.wait()
-        return {'code': 200, 'data': self.data_retrieve()}
+        return {'data': self.data_retrieve()}
 
     def update_notify(self):
         self.update_event.set()
@@ -137,14 +131,15 @@ class Notifier(Resource):
 class Container(Notifier):
 
     def data_retrieve(self):
-        return [path for path in self.children.keys().copy()]
+        children = self.children.copy()
+        return [path for path in children.keys()]
 
     def add_child(self, path, resource):
-        Resource.add_child(path, resource)
+        Resource.add_child(self, path, resource)
         self.update_notify()
 
     def wait_for_delete(self, path):
-        Resource.wait_for_child_delete()
+        Resource.wait_for_child_delete(self)
         self.update_notify()
 
 
@@ -152,15 +147,15 @@ class Game(Container):
 
     def do_POST(self, data):
         if 'password' not in data:
-            return {'code': 403} #TODO
+            return {'code': http.client.NOT_ACCEPTABLE}
 
         p = Player(data)
         token = self.get_token()
         self.add_child(token, p)
         self.update_notify()
 
-        full_path = self.path + '/' + token
-        return {'code': 201, 'headers': [('Location', full_path)]}
+        return {'code': http.client.CREATED,
+                'headers': [('Location', token)]}
 
     def get_token(self):
         h = hashlib.md5()
@@ -182,6 +177,7 @@ class Player(Notifier):
         self.attributes = data
         self.attributes.update({
             'hp': 10,
+            'kills': 0,
             'position': {'x': 0, 'y': 0},
             'movement': {'x': 0, 'y': 0},
             'combat': {'x': 0, 'y': 0},
@@ -197,20 +193,14 @@ class Player(Notifier):
                 self.attributes[field].update(data[field])
 
         self.update_notify()
-        return {'code': 202}
-
-    def do_DELETE(self, data):
-        self.update_notify()
-        self.delete_event.set()
-        return {'code': 204}
+        return {'code': http.client.ACCEPTED}
 
 
 if __name__ == '__main__':
     server = Server('localhost', int(sys.argv[1]) if len(sys.argv) > 1 else 80)
 
-    game = Game(0.25)
+    game = Game()
     server.root.add_child('game', game)
-    game.start()
 
     try:
         server.serve_forever()
