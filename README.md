@@ -97,21 +97,21 @@ servidor. Espera-se que clientes continuamente solicitem (através de por exempl
 
 #### Exemplo
 
-1. ```sh
-   $ while true; do curl --request GET localhost:8000/game; done
-   ```
+```sh
+$ while true; do curl --request GET localhost:8000/game; done
+```
 
-2. ```sh
-   $ curl --request POST --data '{"name": "foo"}' localhost:8000/game
-   $ curl --request POST --data '{"name": "bar"}' localhost:8000/game
-   $ curl --request PUT --data '{"combat": {"x": 1, "y": -1}}' localhost:8000/game/abcdef0123456789
-   ```
+```sh
+$ curl --request POST --data '{"name": "foo"}' localhost:8000/game
+$ curl --request POST --data '{"name": "bar"}' localhost:8000/game
+$ curl --request PUT --data '{"combat": {"x": 1, "y": -1}}' localhost:8000/game/abcdef0123456789
+```
 
-1. ```sh
-   {"name": "foo", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
-   {"name": "bar", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
-   {"name": "foo", "combat": {"y": 1, "x": -1}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
-   ```
+```sh
+{"name": "foo", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+{"name": "bar", "combat": {"y": 0, "x": 0}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+{"name": "foo", "combat": {"y": 1, "x": -1}, "movement": {"y": 0, "x": 0}, "position": {"y": 0, "x": 0}, "hp": 10}
+```
 
 ### DELETE /game/[token]
 

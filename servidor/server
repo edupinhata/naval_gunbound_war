@@ -77,7 +77,7 @@ class Resource(object):
 
         self.path = ''
         self.children = {}
-        self.delete_event = threading.Event()
+        self.delete_event = threading.Event() # TODO suportar múltiplos ouvintes
 
     def do_GET(self, data):
         return self.default_reply
