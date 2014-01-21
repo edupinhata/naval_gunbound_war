@@ -18,7 +18,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
         socketserver.ThreadingMixIn.__init__(self)
         http.server.HTTPServer.__init__(self, (address, port), Handler)
         self.root = Resource()
-        self.not_found = Resource({'code': 404})
+        self.not_found = Resource({'code': http.client.NOT_FOUND})
 
     def find_resource(self, path):
         path_list = path.split('/')
@@ -80,7 +80,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 class Resource(object):
 
-    def __init__(self, default_reply={'code': 405}):
+    def __init__(self, default_reply={'code': http.client.METHOD_NOT_ALLOWED}):
         self.default_reply = default_reply
 
         self.path = ''
