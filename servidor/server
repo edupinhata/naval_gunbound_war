@@ -138,8 +138,13 @@ class Game(Notifier, threading.Thread):
         if 'name' not in data:
             return {'code': 403} # TODO achar código melhor
 
+        public_token = self.get_token()
+        private_token = self.get_token()
+
+        data.update({'id': public_token})
         p = Player(data)
-        self.add_child(self.get_token(), p)
+
+        self.add_child(private_token, p)
         p.update_event.set()
 
         return {'code': 201, 'headers': [('Location', p.path)]}
@@ -173,12 +178,14 @@ class Player(Resource):
     def __init__(self, data):
         Resource.__init__(self)
         self.update_event = threading.Event()
-        self.attributes = {'name': data['name'],
-                           'hp': 10,
-                           'position': {'x': 0, 'y': 0},
-                           'movement': {'x': 0, 'y': 0},
-                           'combat': {'x': 0, 'y': 0},
-                           'delete': False}
+        self.attributes = data
+        self.attributes.update({
+            'hp': 10,
+            'position': {'x': 0, 'y': 0},
+            'movement': {'x': 0, 'y': 0},
+            'combat': {'x': 0, 'y': 0},
+            'delete': False}
+            })
 
     def do_GET(self, data):
         return {'code': 200, 'data': self.attributes}
