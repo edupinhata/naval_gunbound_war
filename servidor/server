@@ -2,6 +2,7 @@
 
 import socketserver
 import http.server
+import email.utils
 import threading
 import hashlib
 import json
@@ -46,13 +47,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.reply(self.server.find_resource(self.path).do_DELETE(self.read()))
 
     def read(self):
+        data = {'timestamp': self.get_timestamp()}
         try:
             length = int(self.headers['Content-Length'])
             string = self.rfile.read(length).decode('utf-8')
-
-            return json.loads(string)
+            data.update(json.loads(string))
         except:
-            return {}
+            pass
+        finally:
+            return data
 
     def reply(self, args={}):
         try:
@@ -69,6 +72,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(bytes(json.dumps(response['data']), 'utf-8'))
         except:
             pass
+
+    def get_timestamp(self):
+        field = 'If-Modified-Since'
+        if field not in self.headers:
+            return time.mktime(time.gmtime(0))
+        return time.mktime(email.utils.parsedate((self.headers[field])))
 
 
 class Resource(object):
