@@ -147,13 +147,17 @@ class Game(Container):
 
     def do_POST(self, data):
         if 'password' not in data:
-            return {'code': http.client.NOT_ACCEPTABLE}
+            return {'code': http.client.EXPECTATION_FAILED}
 
-        p = Player(data)
+        password = data['password']
+        del data['password']
+
+        p = Player(data, password)
+
         token = self.get_token()
         self.add_child(token, p)
-        self.update_notify()
 
+        self.update_notify()
         return {'code': http.client.CREATED,
                 'headers': [('Location', token)]}
 
@@ -172,8 +176,9 @@ class Game(Container):
 
 class Player(Notifier):
 
-    def __init__(self, data):
+    def __init__(self, data, password):
         Resource.__init__(self)
+        self.password = password
         self.attributes = data
         self.attributes.update({
             'hp': 10,
@@ -187,7 +192,11 @@ class Player(Notifier):
         return self.attributes
 
     def do_PUT(self, data):
-        # TODO validar dados
+        if 'password' not in data:
+            return {'code': http.client.EXPECTATION_FAILED}
+        if data['password'] is not self.password:
+            return {'code': http.client.FORBIDDEN}
+
         for field in ['movement', 'combat']:
             if field in data:
                 self.attributes[field].update(data[field])
