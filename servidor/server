@@ -48,6 +48,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def read(self):
         data = {'timestamp': self.get_timestamp()}
+        print(self.get_timestamp())
         try:
             length = int(self.headers['Content-Length'])
             string = self.rfile.read(length).decode('utf-8')
@@ -87,7 +88,7 @@ class Resource(object):
 
         self.path = ''
         self.children = {}
-        self.delete_event = threading.Event() # TODO suportar múltiplos ouvintes
+        self.delete_event = threading.Event()
 
     def do_GET(self, data):
         return self.default_reply
@@ -103,12 +104,10 @@ class Resource(object):
 
     def add_child(self, path, resource):
         self.children[path] = resource
-        resource.path = self.path + '/' + path
-
-        threading.Thread(target=self.wait_delete,
+        threading.Thread(target=self.wait_for_delete,
                 kwargs={'path': path}).start()
 
-    def wait_delete(self, path):
+    def wait_for_delete(self, path):
         resource = self.children[path]
         resource.delete_event.wait()
         del self.children[path]
@@ -118,64 +117,55 @@ class Notifier(Resource):
 
     def __init__(self):
         Resource.__init__(self)
-        self.listeners = []
+        self.timestamp = time.time()
+        self.update_event = threading.Event()
 
     def do_GET(self, data):
-        request = {'event': threading.Event(), 'reply':{}}
+        t = 'timestamp'
+        if t in data and data[t] < self.timestamp:
+            self.update_event.wait()
+        return {'code': 200, 'data': self.data_retrieve()}
 
-        self.listeners += [request]
-        request['event'].wait()
+    def update_notify(self):
+        self.update_event.set()
+        self.update_event.clear()
 
-        return {'code': 200, 'data': request['reply']}
-
-    def notify(self, data={}):
-        listeners = self.listeners
-        self.listeners = []
-
-        for request in listeners:
-            request['reply'] = data
-            request['event'].set()
+    def data_retrieve(self):
+        return None
 
 
-class Game(Notifier, threading.Thread):
+class Container(Notifier):
 
-    def __init__(self, step):
-        Notifier.__init__(self)
-        threading.Thread.__init__(self)
-        self.step = step
+    def data_retrieve(self):
+        return [path for path in self.children.keys().copy()]
+
+    def add_child(self, path, resource):
+        Resource.add_child(path, resource)
+        self.update_notify()
+
+    def wait_for_delete(self, path):
+        Resource.wait_for_child_delete()
+        self.update_notify()
+
+
+class Game(Container):
 
     def do_POST(self, data):
-        # TODO códigos melhores
-        if 'name' not in data:
-            return {'code': 403}
-        for p in self.children.values():
-            if data['name'] == p.attributes['name']:
-                return {'code': 403}
+        if 'password' not in data:
+            return {'code': 403} #TODO
 
         p = Player(data)
         token = self.get_token()
         self.add_child(token, p)
+        self.update_notify()
 
-        p.update_event.set()
-
-        return {'code': 201, 'headers': [('Location', p.path)]}
+        full_path = self.path + '/' + token
+        return {'code': 201, 'headers': [('Location', full_path)]}
 
     def get_token(self):
         h = hashlib.md5()
         h.update(os.urandom(4096))
         return h.hexdigest()
-
-    def add_child(self, path, resource):
-        Resource.add_child(self, path, resource)
-        threading.Thread(target=self.wait_update,
-                kwargs={'path': path}).start()
-
-    def wait_update(self, path):
-        player = self.children[path]
-        while True:
-            player.update_event.wait()
-            player.update_event.clear()
-            self.notify(player.attributes)
 
     def run(self):
         while True:
@@ -185,22 +175,20 @@ class Game(Notifier, threading.Thread):
                 # TODO lógica do jogo aqui
 
 
-class Player(Resource):
+class Player(Notifier):
 
     def __init__(self, data):
         Resource.__init__(self)
-        self.update_event = threading.Event()
         self.attributes = data
         self.attributes.update({
             'hp': 10,
             'position': {'x': 0, 'y': 0},
             'movement': {'x': 0, 'y': 0},
             'combat': {'x': 0, 'y': 0},
-            'delete': False
             })
 
-    def do_GET(self, data):
-        return {'code': 200, 'data': self.attributes}
+    def data_retrieve(self):
+        return self.attributes
 
     def do_PUT(self, data):
         # TODO validar dados
@@ -208,20 +196,13 @@ class Player(Resource):
             if field in data:
                 self.attributes[field].update(data[field])
 
+        self.update_notify()
         return {'code': 202}
 
     def do_DELETE(self, data):
-        self.die()
-        return {'code': 204}
-
-    def update(self, data):
-        self.update_event.set()
-        # TODO
-
-    def die(self):
-        self.attributes['delete'] = True
-        self.update_event.set()
+        self.update_notify()
         self.delete_event.set()
+        return {'code': 204}
 
 
 if __name__ == '__main__':
