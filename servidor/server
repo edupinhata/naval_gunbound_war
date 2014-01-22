@@ -5,6 +5,7 @@ import http.server
 import http.client
 import email.utils
 import threading
+import argparse
 import hashlib
 import json
 import time
@@ -286,9 +287,17 @@ class Player(Monitor):
 # das classes deste. Esta condição previne que o trecho de código abaixo seja
 # executado caso o script executado não seja este arquivo.
 if __name__ == '__main__':
-    server = Server('localhost', int(sys.argv[1]) if len(sys.argv) > 1 else 80)
+    parser = argparse.ArgumentParser(description='Servidor do jogo.',
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-p', '--port', type=int, default=80,
+            help='A porta para hospedar o servidor.')
+    parser.add_argument('-s', '--step', type=float, default=0.5,
+            help='O intervalo de tempo em segundos entre atualizações.')
+    args = parser.parse_args()
 
-    game = Game()
+    server = Server('localhost', args.port)
+    game = Game(args.step)
+
     server.root.add_child('game', game)
 
     try:
