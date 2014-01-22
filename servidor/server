@@ -57,7 +57,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def reply(self, args={}):
         try:
-            response = {'code': http.client.OK, 'headers': [], 'data': None}
+            response = {'code': http.client.OK,
+                        'data': None,
+                        'headers': []}
             response.update(args)
 
             self.send_response(response['code'])
@@ -118,7 +120,9 @@ class Notifier(Resource):
         t = 'timestamp'
         if t in data and data[t] > self.timestamp:
             self.update_event.wait()
-        return {'data': self.data_retrieve()}
+        return {'data': self.data_retrieve(),
+                'headers': [('Last-Modified',
+                             email.utils.formatdate(self.timestamp))]}
 
     def update_notify(self):
         self.update_event.set()
@@ -139,15 +143,19 @@ class Container(Notifier):
         self.update_notify()
 
     def wait_for_delete(self, path):
-        Resource.wait_for_child_delete(self)
+        Resource.wait_for_delete(self, path)
         self.update_notify()
 
 
 class Game(Container):
 
     def do_POST(self, data):
+        if 'timestamp' in data:
+            del data['timestamp']
+
         if 'password' not in data:
-            return {'code': http.client.EXPECTATION_FAILED}
+            return {'code': http.client.EXPECTATION_FAILED,
+                    'headers': [('Accept', 'application/json')]}
 
         password = data['password']
         del data['password']
@@ -177,7 +185,7 @@ class Game(Container):
 class Player(Notifier):
 
     def __init__(self, data, password):
-        Resource.__init__(self)
+        Notifier.__init__(self)
         self.password = password
         self.attributes = data
         self.attributes.update({
@@ -194,7 +202,7 @@ class Player(Notifier):
     def do_PUT(self, data):
         if 'password' not in data:
             return {'code': http.client.EXPECTATION_FAILED}
-        if data['password'] is not self.password:
+        if data['password'] != self.password:
             return {'code': http.client.FORBIDDEN}
 
         for field in ['movement', 'combat']:
