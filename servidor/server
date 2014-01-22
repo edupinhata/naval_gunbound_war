@@ -109,7 +109,7 @@ class Resource(object):
         del self.children[path]
 
 
-class Notifier(Resource):
+class Monitor(Resource):
 
     def __init__(self):
         Resource.__init__(self)
@@ -120,31 +120,31 @@ class Notifier(Resource):
         t = 'timestamp'
         if t in data and data[t] > self.timestamp:
             self.update_event.wait()
-        return {'data': self.data_retrieve(),
+        return {'data': self.get_data(),
                 'headers': [('Last-Modified',
                              email.utils.formatdate(self.timestamp))]}
 
-    def update_notify(self):
+    def notify(self):
         self.update_event.set()
         self.update_event.clear()
 
-    def data_retrieve(self):
+    def get_data(self):
         return None
 
 
-class Container(Notifier):
+class Container(Monitor):
 
-    def data_retrieve(self):
+    def get_data(self):
         children = self.children.copy()
         return [path for path in children.keys()]
 
     def add_child(self, path, resource):
         Resource.add_child(self, path, resource)
-        self.update_notify()
+        self.notify()
 
     def wait_for_delete(self, path):
         Resource.wait_for_delete(self, path)
-        self.update_notify()
+        self.notify()
 
 
 class Game(Container):
@@ -165,7 +165,7 @@ class Game(Container):
         token = self.get_token()
         self.add_child(token, p)
 
-        self.update_notify()
+        self.notify()
         return {'code': http.client.CREATED,
                 'headers': [('Location', token)]}
 
@@ -182,10 +182,10 @@ class Game(Container):
                 # TODO lógica do jogo aqui
 
 
-class Player(Notifier):
+class Player(Monitor):
 
     def __init__(self, data, password):
-        Notifier.__init__(self)
+        Monitor.__init__(self)
         self.password = password
         self.attributes = data
         self.attributes.update({
@@ -196,7 +196,7 @@ class Player(Notifier):
             'combat': {'x': 0, 'y': 0},
             })
 
-    def data_retrieve(self):
+    def get_data(self):
         return self.attributes
 
     def do_PUT(self, data):
@@ -209,7 +209,7 @@ class Player(Notifier):
             if field in data:
                 self.attributes[field].update(data[field])
 
-        self.update_notify()
+        self.notify()
         return {'code': http.client.ACCEPTED}
 
 
