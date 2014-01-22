@@ -95,7 +95,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             pass
 
     # Obtém o timestamp da requisição. Pode estar no cabeçalho, mas se não
-    # estiver, usa a data atual.
+    # estiver, usa a menor data possível para indicar que o cliente não tem
+    # nenhum dado.
     def get_timestamp(self):
         field = 'If-Modified-Since'
         if field not in self.headers:
@@ -281,6 +282,9 @@ class Player(Monitor):
         self.notify()
 
 
+# Este arquivo pode ser importado como um módulo por outro que queira fazer uso
+# das classes deste. Esta condição previne que o trecho de código abaixo seja
+# executado caso o script executado não seja este arquivo.
 if __name__ == '__main__':
     server = Server('localhost', int(sys.argv[1]) if len(sys.argv) > 1 else 80)
 
