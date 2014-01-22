@@ -12,14 +12,22 @@ import sys
 import os
 
 
+# O servidor. Contém o recurso raíz, e um método para encontrar recursos a
+# partir daquele.
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
+    # Construtor. Cria um recurso raíz e um recurso simbolizando "não
+    # encontrado".
     def __init__(self, address, port):
         socketserver.ThreadingMixIn.__init__(self)
         http.server.HTTPServer.__init__(self, (address, port), Handler)
         self.root = Resource()
         self.not_found = Resource({'code': http.client.NOT_FOUND})
 
+    # Método para encontrar um recurso dado um caminho, separado por '/'.
+    # Se não encontrá-lo, devolve o recurso "não encontrado". Por exemplo, para
+    # encontrar o recurso /game/abc123, procura-se o recurso "game" no recurso
+    # raíz, e nele o recurso "abc123".
     def find_resource(self, path):
         path_list = path.split('/')
         path_list.pop(0)
@@ -29,21 +37,31 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
             if child not in res.children:
                 return self.not_found
             res = res.children[child]
-
         return res
 
 
+# Esta classe é instanciada para cada requisição feita ao servidor, e é
+# responsável por ler os dados de entrada, tratá-los e enviar a resposta.
+# Neste programa, cada recurso é responsável por tratar requisições feitas a si
+# mesmo, então o tratamento consiste em chamar o método correspondente no
+# recurso e enviar como resposta o retorno.
 class Handler(http.server.BaseHTTPRequestHandler):
 
+    # Trata uma requisição GET.
     def do_GET(self):
         self.reply(self.server.find_resource(self.path).do_GET(self.read()))
 
+    # Trata uma requisição POST.
     def do_POST(self):
         self.reply(self.server.find_resource(self.path).do_POST(self.read()))
 
+    # Trata uma requisição PUT.
     def do_PUT(self):
         self.reply(self.server.find_resource(self.path).do_PUT(self.read()))
 
+    # Lê o corpo da mensagem formatado como JSON e devolve um dicionário
+    # correspondente. Adiciona um campo timestamp correspondente à última
+    # atualização do cliente. Recursos podem ou não fazer uso dele.
     def read(self):
         data = {'timestamp': self.get_timestamp()}
         try:
@@ -55,6 +73,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         finally:
             return data
 
+    # Responde a requisição com um código de status, campos de cabeçalho e
+    # corpo da mensagem, todos opcionais. O corpo da mensagem deve ser um
+    # dicionário, a ser formatado como JSON para transmissão.
     def reply(self, args={}):
         try:
             response = {'code': http.client.OK,
@@ -73,6 +94,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except:
             pass
 
+    # Obtém o timestamp da requisição. Pode estar no cabeçalho, mas se não
+    # estiver, usa a data atual.
     def get_timestamp(self):
         field = 'If-Modified-Since'
         if field not in self.headers:
@@ -80,75 +103,110 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return time.mktime(email.utils.parsedate((self.headers[field])))
 
 
+# Classe abstrata. Cada recurso sabe responder requisições feitas a ele.
+# Tipicamente, uma requisição GET retorna os dados do recurso, POST cria um
+# recurso filho nele, e PUT atualiza os dados.
 class Resource(object):
 
+    # Construtor. Define o código de retorno padrão como "método não
+    # permitido". É esperado que subclasses retornem seus próprios códigos.
     def __init__(self, default_reply={'code': http.client.METHOD_NOT_ALLOWED}):
         self.default_reply = default_reply
 
-        self.path = ''
         self.children = {}
         self.delete_event = threading.Event()
 
+    # Trata uma requisição GET.
     def do_GET(self, data):
         return self.default_reply
 
+    # Trata uma requisição POST.
     def do_POST(self, data):
         return self.default_reply
 
+    # Trata uma requisição PUT.
     def do_PUT(self, data):
         return self.default_reply
 
+    # Adiciona um recurso filho dado um caminho relativo. Cria um thread que
+    # espera até o recurso querer ser removido.
     def add_child(self, path, resource):
         self.children[path] = resource
         threading.Thread(target=self.wait_for_delete,
                 kwargs={'path': path}).start()
 
+    # Espera pelo disparo do evento que significa que o recurso filho, mapeado
+    # por um caminho, quer ser removido, e remove o recurso.
     def wait_for_delete(self, path):
         resource = self.children[path]
         resource.delete_event.wait()
         del self.children[path]
 
 
+# Classe abstrata que monitora sua data de atualização. Requisições GET de
+# clientes que já tenham o recurso atualizado serão bloqueadas até que o evento
+# sinalizando atualização seja disparado.
 class Monitor(Resource):
 
+    # Construtor. Define a última data de atualização como "agora".
     def __init__(self):
         Resource.__init__(self)
         self.timestamp = time.time()
         self.update_event = threading.Event()
 
+    # Trata uma requisição GET, bloqueando se for necessário. Após a liberação,
+    # retorna os dados do recurso.
     def do_GET(self, data):
-        t = 'timestamp'
-        if t in data and data[t] > self.timestamp:
+        if data['timestamp'] >= self.timestamp:
             self.update_event.wait()
         return {'data': self.get_data(),
                 'headers': [('Last-Modified',
                              email.utils.formatdate(self.timestamp))]}
 
+    # Atualiza o timestamp e dispara o evento sinalizando atualização.
     def notify(self):
+        self.timestamp = time.time()
         self.update_event.set()
         self.update_event.clear()
 
+    # Método abstrato que obtém os dados do recurso.
     def get_data(self):
         return None
 
 
+# Recurso cujos dados são os recursos filhos, e os monitora por adições e
+# remoções.
 class Container(Monitor):
 
+    # Retorna uma lista do caminho relativo de cada recurso filho.
     def get_data(self):
         children = self.children.copy()
         return [path for path in children.keys()]
 
+    # Ao adicionar um recurso filho, notifica por atualizações.
     def add_child(self, path, resource):
         Resource.add_child(self, path, resource)
         self.notify()
 
+    # Ao remover um recurso filho, notifica por atualizações.
     def wait_for_delete(self, path):
         Resource.wait_for_delete(self, path)
         self.notify()
 
 
-class Game(Container):
+# O jogo é um container cujo recursos filhos monitorados são os jogadores.
+# Adicionalmente, executa sua lógica e envia notificações a cada intervalo de
+# tempo.
+class Game(Container, threading.Thread):
 
+    # Construtor. Recebe o intervalo de tempo entre cada execução da lógica.
+    def __init__(self, time_step):
+        Container.__init__(self)
+        threading.Thread.__init__(self)
+
+        self.time_step = time_step
+
+    # Cria um recurso filho (um jogador), validando dados de entrada.
     def do_POST(self, data):
         if 'timestamp' in data:
             del data['timestamp']
@@ -169,21 +227,26 @@ class Game(Container):
         return {'code': http.client.CREATED,
                 'headers': [('Location', token)]}
 
+    # Método para gerar um caminho relativo "único" para cada jogador criado.
     def get_token(self):
         h = hashlib.md5()
         h.update(os.urandom(4096))
         return h.hexdigest()
 
+    # Executa a lógica do jogo e envia notificações em seguida, repetidamente.
     def run(self):
         while True:
             time.sleep(self.step)
-            for p in game.children.values():
+            for p in self.children.values():
                 p.update({})
                 # TODO lógica do jogo aqui
+            self.notify()
 
 
+# Um jogador monitora seu estado, que é um conjunto de atributos.
 class Player(Monitor):
 
+    # Construtor. Recebe uma senha para modificações.
     def __init__(self, data, password):
         Monitor.__init__(self)
         self.password = password
@@ -196,21 +259,26 @@ class Player(Monitor):
             'combat': {'x': 0, 'y': 0},
             })
 
+    # ...
     def get_data(self):
         return self.attributes
 
+    # Valida dados de entrada e chama atualização.
     def do_PUT(self, data):
         if 'password' not in data:
             return {'code': http.client.EXPECTATION_FAILED}
         if data['password'] != self.password:
             return {'code': http.client.FORBIDDEN}
 
+        self.update(data)
+        return {'code': http.client.ACCEPTED}
+
+    # Atualiza dados e dispara notificação.
+    def update(self, data):
         for field in ['movement', 'combat']:
             if field in data:
                 self.attributes[field].update(data[field])
-
         self.notify()
-        return {'code': http.client.ACCEPTED}
 
 
 if __name__ == '__main__':
