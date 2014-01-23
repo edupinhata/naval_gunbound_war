@@ -8,6 +8,14 @@ import json
 import time
 
 
+# Faz uma requisição a partir de uma nova conexão HTTP e devolve a resposta.
+def new_request(host, method, resource, data={}, headers={}):
+    connection = http.client.HTTPConnection(host)
+    connection.request(method, resource,
+            bytes(json.dumps(data), 'utf-8'), headers)
+    return connection.getresponse()
+
+
 # Classe abstrata que requisita repetidamente um recurso e espera até que o
 # servidor tenha atualizações, e então passa os dados recebidos para o método
 # abstrato update().
@@ -60,29 +68,14 @@ class Game(Poller):
     # jogador, e o cria.
     def __init__(self, host, resource, script, data):
         Poller.__init__(self, host, resource)
-        self.init_script(script)
-        self.init_player(data)
+        self.you = You(host, resource, script, data)
         self.players = {}
-
-    # Lê o script.
-    def init_script(self, filename):
-        f = open(filename)
-        self.script = f.read()
-        f.close()
-        self.script_lock = threading.Semaphore()
-
-    # Cria o nosso jogador.
-    def init_player(self, data):
-        self.password = data['password']
-        response = self.single_request('POST', self.resource, data)
-        self.token = response.getheader('Location') # TODO validar
-        response.close()
-        self.you = self.create_player(self.token)
 
     # Cria um objeto Player e um thread para ouvir eventos de atualização,
     # indicando que o script deve ser executado.
-    def create_player(self, token):
-        p = Player(self.host, self.get_path(token))
+    def add_player(self, token):
+        p = Player(self.host, self.resource + '/' + token)
+        p.thread.start()
         threading.Thread(target=self.wait_for_player_update,
                 kwargs={'player': p}).start()
         return p
@@ -95,33 +88,8 @@ class Game(Poller):
     def wait_for_player_update(self, player):
         while True:
             player.update_event.wait()
-            threading.Thread(target=self.execute).start()
-
-    # Faz uma única requisição e fecha a conexão, ao contrário de poll(), que a
-    # mantém aberta. Retorna a resposta.
-    def single_request(self, method, resource, data={}, headers={}):
-        connection = http.client.HTTPConnection(self.host)
-        connection.request(method, resource,
-                bytes(json.dumps(data), 'utf-8'), headers)
-        return connection.getresponse()
-
-    # Executa o script, expondo os atributos dos jogador e os outros jogadores.
-    # Ao final, se foram feitas modificações nos atributos, pede ao
-    # servidor para atualizá-las.
-    def execute(self):
-        self.script_lock.acquire()
-        current = self.you.attributes.copy()
-
-        exec(self.script, {'attributes': current,
-                           'players': self.players.copy()})
-
-        self.send_update(current)
-        self.script_lock.release()
-
-    # Envia ao servidor uma atualização do nosso jogador.
-    def send_update(self, data):
-        data.update({"password": self.password})
-        self.single_request('PUT', self.get_path(self.token), data).close()
+            threading.Thread(target=self.you.execute,
+                    kwargs={'other_players': self.players}).start()
 
     # Método implementado da superclasse. Dados recebidos são uma lista de
     # tokens representando cada jogador. Tokens que não estão no nosso
@@ -129,9 +97,9 @@ class Game(Poller):
     # dicionário que não estão nos dados recebidos são jogadores removidos.
     def update(self, data):
         players = {t: p for t, p in self.players.items()
-                   if t in data and t != self.token}
-        players.update({t: self.create_player(t) for t in data
-                   if t not in self.players and t != self.token})
+                   if t in data and t != self.you.token}
+        players.update({t: self.add_player(t) for t in data
+                   if t not in self.players and t != self.you.token})
         self.players = players
 
 
@@ -145,16 +113,59 @@ class Player(Poller):
         self.attributes = {}
         self.update_event = threading.Event()
 
-        self.thread.start()
-
     # Método implementado da superclasse. Os dados recebidos são os atributos
     # do jogador. Dispara o evento de atualização.
     def update(self, data):
         self.attributes = data
-        print(self.attributes)
 
         self.update_event.set()
         self.update_event.clear()
+
+
+# O próprio jogador. Possui métodos para reagir a atualizações dos outros
+# jogadores e enviar modificações do estado para o servidor.
+class You(Player):
+
+    # Construtor. Inicializa o script e cria o recurso no servidor.
+    def __init__(self, host, parent_resource, script, data):
+        Player.__init__(self, host, parent_resource)
+        self.init_script(script)
+        self.init_player(data)
+        self.thread.start()
+
+    # Lê o script, deixando-o pronto pra ser executado.
+    def init_script(self, filename):
+        f = open(filename)
+        self.script = f.read()
+        f.close()
+        self.script_lock = threading.Semaphore()
+
+    # Cria o nosso jogador.
+    def init_player(self, data):
+        self.password = data['password']
+        response = new_request(self.host, 'POST', self.resource, data)
+        self.token = response.getheader('Location') # TODO validar
+        response.close()
+        self.resource += '/' + self.token
+
+    # Executa o script, expondo os atributos dos jogador e os outros jogadores.
+    # Ao final, se foram feitas modificações nos atributos, pede ao
+    # servidor para atualizá-las.
+    def execute(self, other_players):
+        self.script_lock.acquire()
+        attributes = self.attributes.copy()
+        other_players = other_players.copy()
+
+        exec(self.script, {'attributes': attributes,
+                           'players': other_players})
+
+        self.refresh(attributes)
+        self.script_lock.release()
+
+    # Envia ao servidor uma atualização do nosso jogador.
+    def refresh(self, data):
+        data.update({"password": self.password})
+        new_request(self.host, 'PUT', self.resource, data).close()
 
 
 # Main.
