@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+
+import http.client
+import email.utils
+import threading
+import argparse
+import json
+import time
+
+
+# Classe abstrata que requisita repetidamente um recurso e espera até que o
+# servidor tenha atualizações, e então passa os dados recebidos para o método
+# abstrato update().
+class Poller():
+
+    # Construtor. Inicializa o timestamp como o menor possível, pois ainda não
+    # há dados recebidos.
+    def __init__(self, host, resource):
+        self.host = host
+        self.resource = resource
+        self.timestamp = time.mktime(time.gmtime(0))
+        self.thread = threading.Thread(target=self.poll)
+
+    # Método que requisita (atualizações de) o recurso repetidamente. Ao
+    # receber os dados, atualiza o timestamp, e passa para o método update. Se
+    # encontrar erro na conexão, pára.
+    def poll(self):
+        connection = http.client.HTTPConnection(self.host)
+        while True:
+            connection.request('GET', self.resource,
+                               headers={'If-Modified-Since':
+                                   email.utils.formatdate(self.timestamp)})
+
+            response = connection.getresponse()
+
+            last_modified = response.getheader('Last-Modified',
+                    email.utils.formatdate(time.time()))
+            self.timestamp = time.mktime(email.utils.parsedate(last_modified))
+
+            data = {}
+            try:
+                data = json.loads(response.read().decode('utf-8'))
+            except:
+                pass
+            finally:
+                response.close()
+                self.update(data)
+
+    # Método abstrato para lidar com os dados recebidos.
+    def update(self, data):
+        pass
+
+
+# Mantém jogadores, mapeados por tokens, e o próprio jogador. Recebe
+# atualizações sobre a lista de jogadores e age de acordo.
+class Game(Poller):
+
+    # Construtor. Recebe um filename para o script a ser executado na
+    # atualização dos jogadores, Recebe também os dados para criação do próprio
+    # jogador, e o cria.
+    def __init__(self, host, resource, script, data):
+        Poller.__init__(self, host, resource)
+        self.init_script(script)
+        self.init_player(data)
+        self.players = {}
+
+    # Lê o script.
+    def init_script(self, filename):
+        f = open(filename)
+        self.script = f.read()
+        f.close()
+        self.script_lock = threading.Semaphore()
+
+    # Cria o nosso jogador.
+    def init_player(self, data):
+        self.password = data['password']
+        response = self.single_request('POST', self.resource, data)
+        self.token = response.getheader('Location') # TODO validar
+        response.close()
+        self.you = self.create_player(self.token)
+
+    # Cria um objeto Player e um thread para ouvir eventos de atualização,
+    # indicando que o script deve ser executado.
+    def create_player(self, token):
+        p = Player(self.host, self.get_path(token))
+        threading.Thread(target=self.wait_for_player_update,
+                kwargs={'player': p}).start()
+        return p
+
+    # Retorna o caminho completo do recurso de um jogador.
+    def get_path(self, token):
+        return self.resource + '/' + token
+
+    # Espera por atualizações de um jogador
+    def wait_for_player_update(self, player):
+        while True:
+            player.update_event.wait()
+            threading.Thread(target=self.execute).start()
+
+    # Faz uma única requisição e fecha a conexão, ao contrário de poll(), que a
+    # mantém aberta. Retorna a resposta.
+    def single_request(self, method, resource, data={}, headers={}):
+        connection = http.client.HTTPConnection(self.host)
+        connection.request(method, resource,
+                bytes(json.dumps(data), 'utf-8'), headers)
+        return connection.getresponse()
+
+    # Executa o script, expondo os atributos dos jogador e os outros jogadores.
+    # Ao final, se foram feitas modificações nos atributos, pede ao
+    # servidor para atualizá-las.
+    def execute(self):
+        self.script_lock.acquire()
+        current = self.you.attributes.copy()
+
+        exec(self.script, {'attributes': current,
+                           'players': self.players.copy()})
+
+        self.send_update(current)
+        self.script_lock.release()
+
+    # Envia ao servidor uma atualização do nosso jogador.
+    def send_update(self, data):
+        data.update({"password": self.password})
+        self.single_request('PUT', self.get_path(self.token), data).close()
+
+    # Método implementado da superclasse. Dados recebidos são uma lista de
+    # tokens representando cada jogador. Tokens que não estão no nosso
+    # dicionário são adicionados como jogadores novos, e tokens no nosso
+    # dicionário que não estão nos dados recebidos são jogadores removidos.
+    def update(self, data):
+        players = {t: p for t, p in self.players.items()
+                   if t in data and t != self.token}
+        players.update({t: self.create_player(t) for t in data
+                   if t not in self.players and t != self.token})
+        self.players = players
+
+
+# Um jogador. Dispara um evento a cada atualização.
+class Player(Poller):
+
+    # Construtor. Inicia sua thread que escuta atualizações.
+    def __init__(self, host, resource):
+        Poller.__init__(self, host, resource)
+
+        self.attributes = {}
+        self.update_event = threading.Event()
+
+        self.thread.start()
+
+    # Método implementado da superclasse. Os dados recebidos são os atributos
+    # do jogador. Dispara o evento de atualização.
+    def update(self, data):
+        self.attributes = data
+        print(self.attributes)
+
+        self.update_event.set()
+        self.update_event.clear()
+
+
+# Main.
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Cliente do jogo',
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-p', '--path', default='localhost:8000',
+            help='O endereço do servidor.')
+    parser.add_argument('-n', '--name',
+            help='O nome do jogador.')
+    parser.add_argument('-w', '--password', required=True,
+            help='A senha do jogador.')
+    parser.add_argument('-s', '--script', default='script.py',
+            help='O script do jogador.')
+    args = parser.parse_args()
+
+    game = Game(args.path, '/game', args.script,
+            {"name": args.name, "password": args.password})
+    game.thread.start()
+

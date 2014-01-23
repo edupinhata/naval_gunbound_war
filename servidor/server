@@ -9,7 +9,6 @@ import argparse
 import hashlib
 import json
 import time
-import sys
 import os
 
 
@@ -197,16 +196,14 @@ class Container(Monitor):
 
 
 # O jogo é um container cujo recursos filhos monitorados são os jogadores.
-# Adicionalmente, executa sua lógica e envia notificações a cada intervalo de
-# tempo.
-class Game(Container, threading.Thread):
+# Adicionalmente, executa sua lógica a cada intervalo de tempo.
+class Game(Container):
 
     # Construtor. Recebe o intervalo de tempo entre cada execução da lógica.
     def __init__(self, time_step):
         Container.__init__(self)
-        threading.Thread.__init__(self)
-
         self.time_step = time_step
+        self.thread = threading.Thread(target=self.run)
 
     # Cria um recurso filho (um jogador), validando dados de entrada.
     def do_POST(self, data):
@@ -238,10 +235,9 @@ class Game(Container, threading.Thread):
     # Executa a lógica do jogo e envia notificações em seguida, repetidamente.
     def run(self):
         while True:
-            time.sleep(self.step)
+            time.sleep(self.time_step)
             for p in self.children.values():
-                p.update({})
-                # TODO lógica do jogo aqui
+                p.update({}) # TODO lógica do jogo aqui
             self.notify()
 
 
@@ -289,7 +285,7 @@ class Player(Monitor):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Servidor do jogo.',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-p', '--port', type=int, default=80,
+    parser.add_argument('-p', '--port', type=int, default=8000,
             help='A porta para hospedar o servidor.')
     parser.add_argument('-s', '--step', type=float, default=0.5,
             help='O intervalo de tempo em segundos entre atualizações.')
@@ -297,11 +293,13 @@ if __name__ == '__main__':
 
     server = Server('localhost', args.port)
     game = Game(args.step)
-
     server.root.add_child('game', game)
+    game.thread.start()
 
     try:
         server.serve_forever()
-    except KeyboardInterrupt:
+    except:
+        pass
+    finally:
         server.socket.close()
 
