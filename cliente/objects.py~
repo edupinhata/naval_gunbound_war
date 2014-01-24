@@ -1,0 +1,56 @@
+#! /usr/bin/env python3
+
+
+#classe que representa uma unidade de objeto. Por exemplo:
+#uma parede é um objeto, um robo é um objeto e um tiro é um objeto
+#para esse jogo, acredito que apenas esses tres elementos bastam
+#Todos os objetos tem uma representação, podem ser impressos,
+#tem uma posição definida, tem tratamento de colisoes
+
+#A princípio, cada objeto ocupa dois espaços, por exemplo, 
+#uma parede é representada por ||                       
+#um robo pode ser representado por uma letra e num. Ex: r1
+#um tiro será representado pela letra o
+
+class objects:
+
+
+    def __init__(self, pos_x, pos_y, represent):
+        self.represent = represent
+        self.pos_x = pos_x
+        self.pos_y = pos_y
+
+
+    #metodos get/set
+    
+    def getX(self):
+        return self.pos_x
+
+    def getY(self):
+        return self.pos_y
+
+    def getRep(self):
+        return represent
+
+    def setX(self, newX):
+        self.pos_x = newX
+
+    def setY(self, newY):
+        self.pos_y = newY
+
+    #movimentacao
+
+    def moveUp(self):
+        self.pos_y -= 1
+        
+    def moveDown(self):
+        self.pos_y += 1
+
+    def moveRight(self):
+        self.pos_x += 2
+
+    def moveLeft(self):
+        self.pos_x -= 2
+
+    #tratamento de colisoes
+    
