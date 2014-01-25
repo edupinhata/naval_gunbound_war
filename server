@@ -5,10 +5,13 @@ import http.server
 import http.client
 import email.utils
 import threading
+import functools
 import argparse
 import hashlib
+import copy
 import json
 import time
+import sys
 import os
 
 
@@ -33,10 +36,10 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
         path_list.pop(0)
 
         res = self.root
-        for child in path_list:
-            if child not in res.children:
+        for name in path_list:
+            if name not in res.children:
                 return self.not_found
-            res = res.children[child]
+            res = res.children[name]
         return res
 
 
@@ -63,59 +66,84 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # correspondente. Adiciona um campo timestamp correspondente à última
     # atualização do cliente. Recursos podem ou não fazer uso dele.
     def read(self):
-        data = {'timestamp': self.get_timestamp()}
+        data = {}
+        length = self.read_length()
+        timestamp = self.read_timestamp()
         try:
-            length = int(self.headers['Content-Length'])
-            string = self.rfile.read(length).decode('utf-8')
-            data.update(json.loads(string))
+            text = self.rfile.read(length).decode('utf-8')
+            data = json.loads(text)
         except:
             pass
         finally:
+            data.update({'timestamp': timestamp})
             return data
 
-    # Responde a requisição com um código de status, campos de cabeçalho e
-    # corpo da mensagem, todos opcionais. O corpo da mensagem deve ser um
-    # dicionário, a ser formatado como JSON para transmissão.
-    def reply(self, args={}):
-        try:
-            response = {'code': http.client.OK,
-                        'data': None,
-                        'headers': []}
-            response.update(args)
-
-            self.send_response(response['code'])
-
-            for h in response['headers']:
-                self.send_header(h[0], h[1])
-            self.end_headers()
-
-            if response['data']:
-                self.wfile.write(bytes(json.dumps(response['data']), 'utf-8'))
-        except:
-            pass
+    # Lê o tamanho da mensagem no cabeçalho. Se não presente, assume 0.
+    def read_length(self):
+        h = 'Content-Length'
+        return int(self.headers[h]) if h in self.headers else 0
 
     # Obtém o timestamp da requisição. Pode estar no cabeçalho, mas se não
     # estiver, usa a menor data possível para indicar que o cliente não tem
     # nenhum dado.
-    def get_timestamp(self):
+    def read_timestamp(self):
         field = 'If-Modified-Since'
         if field not in self.headers:
             return time.mktime(time.gmtime(0))
         return time.mktime(email.utils.parsedate((self.headers[field])))
 
+    # Responde a requisição com um código de status, campos de cabeçalho e
+    # corpo da mensagem, todos opcionais. O corpo da mensagem deve ser um
+    # dicionário, a ser formatado como JSON para transmissão.
+    def reply(self, args={}):
+        response = {'code': http.client.OK, 'data': None, 'headers': []}
+        response.update(args)
 
-# Classe abstrata. Cada recurso sabe responder requisições feitas a ele.
+        code = response['code']
+        headers = response['headers'] + [('Content-Type', 'text/json')]
+        text = json.dumps(response['data'])
+
+        try:
+            self.send_response(code)
+
+            for h in headers:
+                self.send_header(h[0], h[1])
+            self.end_headers()
+
+            self.wfile.write(bytes(text, 'utf-8'))
+        except:
+            pass
+
+
+# Classe abstrata. Cada recurso tem um dicionário de recursos filhos, mapeados
+# por um nome, ou caminho relativo. Sabem responder requisições feitas a ele.
 # Tipicamente, uma requisição GET retorna os dados do recurso, POST cria um
 # recurso filho nele, e PUT atualiza os dados.
-class Resource(object):
+class Resource:
 
     # Construtor. Define o código de retorno padrão como "método não
-    # permitido". É esperado que subclasses retornem seus próprios códigos.
+    # permitido". É esperado que subclasses sobrescrevam este comportamento.
     def __init__(self, default_reply={'code': http.client.METHOD_NOT_ALLOWED}):
+        self.children = {}
+        self.on_delete = None
         self.default_reply = default_reply
 
-        self.children = {}
-        self.delete_event = threading.Event()
+    # Adiciona um recurso filho dado um nome do recurso, que é o caminho
+    # relativo ao caminho deste recurso. Também faz com que, ao chamar o método
+    # delete(), chame o método delete_child() deste objeto.
+    def add_child(self, name, resource):
+        self.children[name] = resource
+        resource.on_delete = functools.partial(self.delete_child, name)
+
+    # Delete um recurso filho.
+    def delete_child(self, name):
+        self.children.pop(name)
+
+    # Deleta este recurso. Se tiver sido adicionado a um recurso pai através de
+    # add_child(), chamará o método dele para remover este recurso.
+    def delete(self):
+        if self.on_delete:
+            self.on_delete()
 
     # Trata uma requisição GET.
     def do_GET(self, data):
@@ -128,20 +156,6 @@ class Resource(object):
     # Trata uma requisição PUT.
     def do_PUT(self, data):
         return self.default_reply
-
-    # Adiciona um recurso filho dado um caminho relativo. Cria um thread que
-    # espera até o recurso querer ser removido.
-    def add_child(self, path, resource):
-        self.children[path] = resource
-        threading.Thread(target=self.wait_for_delete,
-                kwargs={'path': path}).start()
-
-    # Espera pelo disparo do evento que significa que o recurso filho, mapeado
-    # por um caminho, quer ser removido, e remove o recurso.
-    def wait_for_delete(self, path):
-        resource = self.children[path]
-        resource.delete_event.wait()
-        del self.children[path]
 
 
 # Classe abstrata que monitora sua data de atualização. Requisições GET de
@@ -179,10 +193,10 @@ class Monitor(Resource):
 # remoções.
 class Container(Monitor):
 
-    # Retorna uma lista do caminho relativo de cada recurso filho.
+    # Implementado da superclasse. Retorna uma lista do caminho relativo de
+    # cada recurso filho.
     def get_data(self):
-        children = self.children.copy()
-        return [path for path in children.keys()]
+        return [name for name in self.children.copy()]
 
     # Ao adicionar um recurso filho, notifica por atualizações.
     def add_child(self, path, resource):
@@ -190,55 +204,54 @@ class Container(Monitor):
         self.notify()
 
     # Ao remover um recurso filho, notifica por atualizações.
-    def wait_for_delete(self, path):
-        Resource.wait_for_delete(self, path)
+    def delete_child(self, path):
+        Resource.delete_child(self, path)
         self.notify()
 
 
 # O jogo é um container cujo recursos filhos monitorados são os jogadores.
 # Adicionalmente, executa sua lógica a cada intervalo de tempo.
-class Game(Container):
+class Game(Container, threading.Thread):
 
     # Construtor. Recebe o intervalo de tempo entre cada execução da lógica.
     def __init__(self, time_step):
+        threading.Thread.__init__(self)
         Container.__init__(self)
         self.time_step = time_step
-        self.thread = threading.Thread(target=self.run)
 
-    # Cria um recurso filho (um jogador), validando dados de entrada.
+    # Cria um recurso filho (um jogador), validando dados de entrada. Como o
+    # conjunto de jogadores foi alterado, dispara notificação ao final.
     def do_POST(self, data):
-        if 'timestamp' in data:
-            del data['timestamp']
-
         if 'password' not in data:
-            return {'code': http.client.EXPECTATION_FAILED,
-                    'headers': [('Accept', 'application/json')]}
+            return {'code': http.client.EXPECTATION_FAILED}
 
+        accepted = ['name']
+
+        attributes={k: v for k, v in data.items() if k in accepted}
         password = data['password']
-        del data['password']
 
-        p = Player(data, password)
+        p = Player(attributes, password)
 
-        token = self.get_token()
+        token = hashlib.md5(os.urandom(4096)).hexdigest()
         self.add_child(token, p)
 
         self.notify()
         return {'code': http.client.CREATED,
                 'headers': [('Location', token)]}
 
-    # Método para gerar um caminho relativo "único" para cada jogador criado.
-    def get_token(self):
-        h = hashlib.md5()
-        h.update(os.urandom(4096))
-        return h.hexdigest()
-
-    # Executa a lógica do jogo e envia notificações em seguida, repetidamente.
+    # Sobrescrito de Thread. Executa a lógica do jogo e envia notificações em
+    # seguida, repetidamente.
+    # TODO colisões
     def run(self):
         while True:
             time.sleep(self.time_step)
             for p in self.children.values():
-                p.update({}) # TODO lógica do jogo aqui
-            self.notify()
+                if not p.moving():
+                    continue
+                a = p.attributes.copy()
+                a['posx'] += p.attributes['movx']
+                a['posy'] += p.attributes['movy']
+                p.update(a)
 
 
 # Um jogador monitora seu estado, que é um conjunto de atributos.
@@ -249,57 +262,57 @@ class Player(Monitor):
         Monitor.__init__(self)
         self.password = password
         self.attributes = data
-        self.attributes.update({
-            'hp': 10,
-            'kills': 0,
-            'position': {'x': 0, 'y': 0},
-            'movement': {'x': 0, 'y': 0},
-            'combat': {'x': 0, 'y': 0},
-            })
+        self.update({'hp': 10, 'posx': 0, 'posy': 0, 'movx': 0, 'movy': 0,
+                     'comx': 0, 'comy': 0, 'kills': 0})
 
-    # ...
+    # Implementado da superclasse. Uma requisição GET retorna os atributos do
+    # jogador.
     def get_data(self):
         return self.attributes
 
-    # Valida dados de entrada e chama atualização.
+    # Valida dados de entrada e chama atualização. Aceita apenas modificações
+    # em movement e combat.
     def do_PUT(self, data):
         if 'password' not in data:
             return {'code': http.client.EXPECTATION_FAILED}
         if data['password'] != self.password:
             return {'code': http.client.FORBIDDEN}
 
-        self.update(data)
+        accepted = ['movx', 'movy', 'comx', 'comy']
+        self.update({k: v for k, v in data.items() if k in accepted})
+
         return {'code': http.client.ACCEPTED}
 
-    # Atualiza dados e dispara notificação.
+    # Atualiza dados e dispara notificação caso haja mudanças.
     def update(self, data):
-        for field in ['movement', 'combat']:
-            if field in data:
-                self.attributes[field].update(data[field])
-        self.notify()
+        changes = False
+        for i, j in data.items():
+            if i not in self.attributes or j != self.attributes[i]:
+                changes = True
+        self.attributes.update(data)
+        if changes:
+            self.notify()
+
+    # Utilitário para determinar se está se movendo.
+    def moving(self):
+        return self.attributes['movx'] != 0 or self.attributes['movy'] != 0
 
 
-# Este arquivo pode ser importado como um módulo por outro que queira fazer uso
-# das classes deste. Esta condição previne que o trecho de código abaixo seja
-# executado caso o script executado não seja este arquivo.
+# Main.
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Servidor do jogo.',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-p', '--port', type=int, default=8000,
             help='A porta para hospedar o servidor.')
-    parser.add_argument('-s', '--step', type=float, default=0.5,
+    parser.add_argument('-s', '--step', type=float, default=0.2,
             help='O intervalo de tempo em segundos entre atualizações.')
     args = parser.parse_args()
 
     server = Server('localhost', args.port)
     game = Game(args.step)
     server.root.add_child('game', game)
-    game.thread.start()
 
-    try:
-        server.serve_forever()
-    except:
-        pass
-    finally:
-        server.socket.close()
+    game.start()
+    server.serve_forever()
+
 
