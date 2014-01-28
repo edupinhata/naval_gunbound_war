@@ -10,7 +10,6 @@ import functools
 import argparse
 import hashlib
 import random
-import copy
 import json
 import time
 import sys
