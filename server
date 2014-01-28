@@ -242,16 +242,17 @@ class Game(Container, threading.Thread):
                 'headers': [('Location', token)]}
 
     # Sobrescrito de Thread. Executa a lógica do jogo e envia notificações em
-    # seguida, repetidamente.
-    # TODO colisões
+    # seguida, repetidamente. Trata colisões.
     def run(self):
         while True:
             time.sleep(self.time_step)
 
-            occupied = collections.defaultdict(dict)
+            occupied = self.get_occupied()
             for p in self.children.values():
-                x = p.attributes['posx'] + p.attributes['movx']
-                y = p.attributes['posy'] + p.attributes['movy']
+                oldx, oldy = p.attributes['posx'], p.attributes['posy']
+                x, y = oldx + p.attributes['movx'], oldy + p.attributes['movy']
+                if x == oldx and y == oldy:
+                    continue
 
                 if x in occupied and y in occupied[x]:
                     p.collide(occupied[x][y])
@@ -259,6 +260,14 @@ class Game(Container, threading.Thread):
                 else:
                     occupied[x][y] = p
                     p.update({'posx': x, 'posy': y})
+
+    # Retorna um dicionário que mapeia para cada X um dicionário. Este mapeia,
+    # para cada Y, um jogador. Substitui uma matriz.
+    def get_occupied(self):
+        d = collections.defaultdict(dict)
+        d.update({p.attributes['posx']: {p.attributes['posy']: p}
+                  for p in self.children.values()})
+        return d
 
 
 # Um jogador monitora seu estado, que é um conjunto de atributos.
