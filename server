@@ -4,6 +4,7 @@ import socketserver
 import http.server
 import http.client
 import email.utils
+import collections
 import threading
 import functools
 import argparse
@@ -245,13 +246,18 @@ class Game(Container, threading.Thread):
     def run(self):
         while True:
             time.sleep(self.time_step)
+
+            occupied = collections.defaultdict(dict)
             for p in self.children.values():
-                if not p.moving():
-                    continue
-                a = p.attributes.copy()
-                a['posx'] += p.attributes['movx']
-                a['posy'] += p.attributes['movy']
-                p.update(a)
+                x = p.attributes['posx'] + p.attributes['movx']
+                y = p.attributes['posy'] + p.attributes['movy']
+
+                if x in occupied and y in occupied[x]:
+                    p.collide(occupied[x][y])
+                    occupied[x][y].collide(p)
+                else:
+                    occupied[x][y] = p
+                    p.update({'posx': x, 'posy': y})
 
 
 # Um jogador monitora seu estado, que é um conjunto de atributos.
@@ -293,9 +299,9 @@ class Player(Monitor):
         if changes:
             self.notify()
 
-    # Utilitário para determinar se está se movendo.
-    def moving(self):
-        return self.attributes['movx'] != 0 or self.attributes['movy'] != 0
+    # Método que trata colisão com outro jogador.
+    def collide(self, player):
+        self.update({'movx': 0, 'movy': 0})
 
 
 # Main.
