@@ -53,15 +53,12 @@ Obtém os atributos correspondentes a um jogador.
  * `name`: string
  * `hp`: int
  * `kills`: int
- * `position`: Objeto
-   * `x`: int
-   * `y`: int
- * `movement`: Objeto
-   * `x`: int
-   * `y`: int
- * `combat`: Objeto
-   * `x`: int
-   * `y`: int
+ * `posx`: int
+ * `posy`: int
+ * `movx`: int
+ * `movy`: int
+ * `comx`: int
+ * `comy`: int
 * Exemplo:
 
 ```sh
@@ -79,11 +76,10 @@ para criação.
 * Entrada: Objeto
  * `password`: string
  * `movement`: Objeto, opcional
-   * `x`: int, opcional
-   * `y`: int, opcional
- * `combat`: Objeto, opcional
-   * `x`: int, opcional
-   * `y`: int, opcional
+ * `movx`: int, opcional
+ * `movy`: int, opcional
+ * `comx`: int, opcional
+ * `comy`: int, opcional
 * Código de retorno: `202 Accepted`
 * Saída: Nenhum
 * Exemplo:
