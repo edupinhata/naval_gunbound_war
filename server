@@ -9,6 +9,7 @@ import threading
 import functools
 import argparse
 import hashlib
+import random
 import copy
 import json
 import time
@@ -268,8 +269,9 @@ class Player(Monitor):
         Monitor.__init__(self)
         self.password = password
         self.attributes = data
-        self.update({'hp': 10, 'posx': 0, 'posy': 0, 'movx': 0, 'movy': 0,
-                     'comx': 0, 'comy': 0, 'kills': 0})
+        self.update({'hp': 10, 'kills': 0,
+            'posx': random.randrange(0, 10), 'posy': random.randrange(0, 10),
+            'movx': 0, 'movy': 0, 'comx': 0, 'comy': 0})
 
     # Implementado da superclasse. Uma requisição GET retorna os atributos do
     # jogador.
