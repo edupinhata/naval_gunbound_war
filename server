@@ -127,6 +127,7 @@ class Resource:
     def __init__(self, default_reply={'code': http.client.METHOD_NOT_ALLOWED}):
         self.children = {}
         self.on_delete = None
+        self.on_add_sibling = None
         self.default_reply = default_reply
 
     # Adiciona um recurso filho dado um nome do recurso, que é o caminho
@@ -135,10 +136,17 @@ class Resource:
     def add_child(self, name, resource):
         self.children[name] = resource
         resource.on_delete = functools.partial(self.delete_child, name)
+        resource.on_add_sibling = self.add_child
 
     # Delete um recurso filho.
     def delete_child(self, name):
         self.children.pop(name)
+
+    # Adiciona um recurso irmão, chamando a função on_add_sibling, geralmente
+    # setada pelo recurso pai no método add_child().
+    def add_sibling(self, name, resource):
+        if self.on_add_sibling:
+            self.on_add_sibling(name, resource)
 
     # Deleta este recurso. Se tiver sido adicionado a um recurso pai através de
     # add_child(), chamará o método dele para remover este recurso.
