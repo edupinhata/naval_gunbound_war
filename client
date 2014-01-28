@@ -219,15 +219,27 @@ class Curses:
         self.draw_lock.release()
 
     def draw_window(self):
+        self.window.erase()
         self.window.border()
+        self.draw_players()
+
+    def draw_players(self):
         self.window.addstr(self.y, self.x, '@')
+        for p in self.game.players.values():
+            x = self.x + p.attributes['posx'] - self.game.you.attributes['posx']
+            y = self.y + p.attributes['posy'] - self.game.you.attributes['posy']
+            if x <= 0 or x >= curses.COLS or y <= 0 or y >= curses.LINES:
+                continue
+            self.window.addstr(y, x, '#')
 
     def draw_status(self):
+        self.status.erase()
         self.status.border()
         self.status.addnstr(0, 1, self.game.you.attributes['name'], 10)
         self.status.addnstr(1, 1, '██████████', self.game.you.attributes['hp'])
 
     def draw_log(self):
+        self.log.erase()
         self.log.border()
         for i in range(3):
             self.log.addstr(3 - i, 1, self.messages[i])
