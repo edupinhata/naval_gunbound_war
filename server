@@ -315,12 +315,8 @@ class Player(Monitor):
         if data['password'] != self.password:
             return {'code': http.client.FORBIDDEN}
 
-        lookx = self.attributes['movx']
-        looky = self.attributes['movy']
-        x = self.attributes['posx'] + lookx
-        y = self.attributes['posy'] + looky
-
-        p = Projectile(x, y, lookx, looky)
+        p = Projectile(self.attributes['posx'], self.attributes['posy'],
+                self.attributes['lookx'], self.attributes['looky'])
 
         token = hashlib.md5(os.urandom(4096)).hexdigest()
         self.add_sibling(token, p)
@@ -356,9 +352,8 @@ class Projectile(Player):
     def __init__(self, posx, posy, lookx, looky):
         Player.__init__(self, None, '')
         self.attributes.update({'hp': 1, name: 'Projectile',
-                                'posx': posx, 'posy': posy,
-                                'movx': lookx, 'movy': looky,
-                                'lookx': lookx, 'looky': looky})
+            'posx': posx + lookx, 'posy': posy + looky,
+            'movx': lookx, 'movy': looky, 'lookx': lookx, 'looky': looky})
 
     # Sobrescrito da superclasse. Um projétil não pode ter seu estado
     # alterado explicitamente por qualquer cliente.
