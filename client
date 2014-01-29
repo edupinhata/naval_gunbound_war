@@ -125,7 +125,7 @@ class Player(Poller):
     # Construtor. Inicia sua thread que escuta atualizações.
     def __init__(self, host, resource):
         Poller.__init__(self, host, resource)
-        self.attributes = {}
+        self.attributes = {'posx': 0, 'posy': 0}
         self.player_update_handler = None
 
     # Método implementado da superclasse. Os dados recebidos são os atributos
@@ -199,9 +199,19 @@ class Curses:
         self.x = int(curses.COLS / 2)
         self.y = int((curses.LINES - 5) / 2)
 
-        self.window = curses.newwin(curses.LINES - 5, curses.COLS)
-        self.status = curses.newwin(3, 12, 1, 1)
-        self.log = curses.newwin(5, curses.COLS, curses.LINES - 5, 0)
+        self.window_width = curses.COLS
+        self.window_height = curses.LINES - 5
+        self.window = curses.newwin(self.window_height, self.window_width)
+
+        self.status_width = 12
+        self.status_height = 3
+        self.status = curses.newwin(self.status_height, self.status_width,
+                1, 1)
+
+        self.log_width = curses.COLS
+        self.log_height = 5
+        self.log = curses.newwin(self.log_height, self.log_width,
+                self.window_height, 0)
 
     def draw(self):
         self.add_message(str(time.time()))
@@ -228,7 +238,8 @@ class Curses:
         for p in self.game.players.values():
             x = self.x + p.attributes['posx'] - self.game.you.attributes['posx']
             y = self.y + p.attributes['posy'] - self.game.you.attributes['posy']
-            if x <= 0 or x >= curses.COLS or y <= 0 or y >= curses.LINES:
+            if x not in range(0, self.window_width)
+            or y not in range(0, self.window_height):
                 continue
             self.window.addstr(y, x, '#')
 
