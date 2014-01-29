@@ -310,6 +310,11 @@ class Player(Monitor):
 
     # Cria um novo recurso a partir de um jogador, ou seja, um tiro.
     def do_POST(self, data):
+        if 'password' not in data:
+            return {'code': http.client.EXPECTATION_FAILED}
+        if data['password'] != self.password:
+            return {'code': http.client.FORBIDDEN}
+
         lookx = self.attributes['movx']
         looky = self.attributes['movy']
         x = self.attributes['posx'] + lookx
