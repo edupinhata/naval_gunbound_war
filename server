@@ -357,7 +357,8 @@ class Projectile(Player):
         Player.__init__(self, None, '')
         self.attributes.update({'hp': 1, name: 'Projectile',
                                 'posx': posx, 'posy': posy,
-                                'movx': lookx, 'movy': looky})
+                                'movx': lookx, 'movy': looky,
+                                'lookx': lookx, 'looky': looky})
 
     # Sobrescrito da superclasse. Um projétil não pode ter seu estado
     # alterado explicitamente por qualquer cliente.
