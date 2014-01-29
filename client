@@ -238,16 +238,16 @@ class Curses:
         for p in self.game.players.values():
             x = self.x + p.attributes['posx'] - self.game.you.attributes['posx']
             y = self.y + p.attributes['posy'] - self.game.you.attributes['posy']
-            if x not in range(0, self.window_width)
-            or y not in range(0, self.window_height):
+            if (x not in range(0, self.window_width) or
+                y not in range(0, self.window_height)):
                 continue
             self.window.addstr(y, x, '#')
 
     def draw_status(self):
         self.status.erase()
-        self.status.border()
-        self.status.addnstr(0, 1, self.game.you.attributes['name'], 10)
+        self.status.addstr(1, 1, '░░░░░░░░░░')
         self.status.addnstr(1, 1, '██████████', self.game.you.attributes['hp'])
+        self.status.addnstr(0, 1, self.game.you.attributes['name'], 10)
 
     def draw_log(self):
         self.log.erase()
