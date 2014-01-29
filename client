@@ -89,10 +89,10 @@ class Game(Poller):
         Poller.__init__(self, host, resource)
 
         self.players = {}
-        self.game_update_handler = None
+        self.on_game_update = None
 
         self.you = You(host, resource, script, data)
-        self.you.player_update_handler = self.game_update
+        self.you.on_update = self.game_update
 
     # Implementado da superclasse. Dados recebidos são uma lista de tokens
     # representando cada jogador. Tokens que não estão no nosso dicionário são
@@ -108,15 +108,15 @@ class Game(Poller):
     # Cria um objeto Player 
     def create_player(self, token):
         p = Player(self.host, self.resource + '/' + token)
-        p.player_update_handler = self.game_update
+        p.on_update = self.game_update
         p.start()
         return p
 
     # Executa o script.
     def game_update(self):
         self.you.execute(self.players)
-        if self.game_update_handler:
-            self.game_update_handler()
+        if self.on_game_update:
+            self.on_game_update()
 
 
 # Um jogador. Dispara um evento a cada atualização.
@@ -126,14 +126,14 @@ class Player(Poller):
     def __init__(self, host, resource):
         Poller.__init__(self, host, resource)
         self.attributes = {'posx': 0, 'posy': 0}
-        self.player_update_handler = None
+        self.on_update = None
 
     # Método implementado da superclasse. Os dados recebidos são os atributos
     # do jogador.
     def update(self, data):
         self.attributes = data
-        if self.player_update_handler:
-            self.player_update_handler()
+        if self.on_update:
+            self.on_update()
 
 
 # O próprio jogador. Possui métodos para reagir a atualizações dos outros
@@ -190,7 +190,7 @@ class Curses:
 
     def __init__(self, screen, game):
         self.game = game
-        self.game.game_update_handler = self.draw
+        self.game.on_game_update = self.draw
 
         self.messages = ['' for i in range(3)]
         self.draw_lock = threading.Semaphore()
