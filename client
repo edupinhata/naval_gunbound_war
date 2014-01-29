@@ -79,7 +79,9 @@ class Poller(threading.Thread):
 
 
 # Mantém jogadores, mapeados por tokens, e o próprio jogador. Recebe
-# atualizações sobre a lista de jogadores e age de acordo.
+# atualizações sobre a lista de jogadores e age de acordo. A variável
+# on_game_update é uma função que é chamada a cada atualização. Pode ser setado
+# por uma interface que queira ser atualizada.
 class Game(Poller):
 
     # Construtor. Recebe um filename para o script a ser executado na
@@ -119,7 +121,8 @@ class Game(Poller):
             self.on_game_update()
 
 
-# Um jogador. Dispara um evento a cada atualização.
+# Um jogador. A variável on_update é uma função que pode ser setada pelo jogo
+# para sinalizar atualização do jogador.
 class Player(Poller):
 
     # Construtor. Inicia sua thread que escuta atualizações.
@@ -188,6 +191,9 @@ class You(Player):
 # Interface textual.
 class Curses:
 
+    # Construtor. Recebe o jogo, e seta a variável on_game_update para
+    # self.draw, ou seja, quando o jogo for atualizado, chamará self.draw,
+    # atualizando a tela.
     def __init__(self, screen, game):
         self.game = game
         self.game.on_game_update = self.draw
@@ -213,6 +219,7 @@ class Curses:
         self.log = curses.newwin(self.log_height, self.log_width,
                 self.window_height, 0)
 
+    # Desenha a tela. 
     def draw(self):
         self.add_message(str(time.time()))
 
@@ -228,11 +235,13 @@ class Curses:
 
         self.draw_lock.release()
 
+    # Desenha a janela principal do jogo.
     def draw_window(self):
         self.window.erase()
         self.window.border()
         self.draw_players()
 
+    # Desenha os personagens na tela.
     def draw_players(self):
         self.window.addstr(self.y, self.x, '@')
         for p in self.game.players.values():
@@ -243,18 +252,21 @@ class Curses:
                 continue
             self.window.addstr(y, x, '#')
 
+    # Desenha o status do jogador.
     def draw_status(self):
         self.status.erase()
         self.status.addstr(1, 1, '░░░░░░░░░░')
         self.status.addnstr(1, 1, '██████████', self.game.you.attributes['hp'])
         self.status.addnstr(0, 1, self.game.you.attributes['name'], 10)
 
+    # Desenha o log de mensagens.
     def draw_log(self):
         self.log.erase()
         self.log.border()
         for i in range(3):
             self.log.addstr(3 - i, 1, self.messages[i])
 
+    # Adiciona uma mensagem.
     def add_message(self, message):
         self.messages.pop()
         self.messages.insert(0, message)
