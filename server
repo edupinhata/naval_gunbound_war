@@ -244,9 +244,9 @@ class Game(Container, threading.Thread):
         token = hashlib.md5(os.urandom(4096)).hexdigest()
         self.add_child(token, p)
 
-        self.notify()
         return {'code': http.client.CREATED,
                 'headers': [('Location', token)]}
+
 
     # Sobrescrito de Thread. Executa a lógica do jogo e envia notificações em
     # seguida, repetidamente. Trata colisões.
@@ -307,6 +307,18 @@ class Player(Monitor):
 
         return {'code': http.client.ACCEPTED}
 
+    # Cria um novo recurso a partir de um jogador, ou seja, um tiro.
+    def do_POST(self, data):
+        lookx = self.attributes['movx']
+        looky = self.attributes['movy']
+        x = self.attributes['posx'] + lookx
+        y = self.attributes['posy'] + looky
+
+        p = Projectile(x, y, lookx, looky)
+
+        token = hashlib.md5(os.urandom(4096)).hexdigest()
+        self.add_sibling(token, p)
+
     # Atualiza dados e dispara notificação caso haja mudanças.
     def update(self, data):
         changes = False
@@ -317,9 +329,41 @@ class Player(Monitor):
         if changes:
             self.notify()
 
-    # Método que trata colisão com outro jogador.
+    # Método que trata colisão com outro jogador. Um jogador que colide apenas
+    # pára de se mover.
     def collide(self, player):
         self.update({'movx': 0, 'movy': 0})
+
+    # Computa dano ao jogador. Se chegar a 0, morre.
+    def damage(self):
+        self.update({'hp': self.attributes['hp'] - 1})
+        if self.attributes['hp'] < 1:
+            self.delete()
+
+
+# Um projétil é um "jogador" que se move em uma direção até colidir com outro
+# jogador.
+class Projectile(Player):
+
+    # Construtor. Recebe a posição de origem, e a direção na qual o projétil
+    # deve se mover.
+    def __init__(self, posx, posy, lookx, looky):
+        Player.__init__(self, None, '')
+        self.attributes.update({'hp': 1, name: 'Projectile',
+                                'posx': posx, 'posy': posy,
+                                'movx': lookx, 'movy': looky})
+
+    # Sobrescrito da superclasse. Um projétil não pode ter seu estado
+    # alterado explicitamente por qualquer cliente.
+    def do_PUT(self, data):
+        return self.default_reply
+
+    # Sobrescrito da superclasse. Um projétil que colide com outro jogador
+    # reduz o HP daquele.
+    def collide(self, player):
+        Player.collide(self, player)
+        player.damage()
+        self.delete()
 
 
 # Main.
