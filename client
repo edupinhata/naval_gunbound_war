@@ -57,8 +57,9 @@ class Poller(threading.Thread):
             connection.request('GET', self.resource,
                                headers={'If-Modified-Since':
                                    email.utils.formatdate(self.timestamp)})
-
             response = connection.getresponse()
+            if response.status == http.client.NOT_FOUND:
+                break
 
             last_modified = response.getheader('Last-Modified',
                     email.utils.formatdate(time.time()))
@@ -128,7 +129,8 @@ class Player(Poller):
     # Construtor. Inicia sua thread que escuta atualizações.
     def __init__(self, host, resource):
         Poller.__init__(self, host, resource)
-        self.attributes = {'posx': 0, 'posy': 0}
+        self.attributes = {'posx': 0, 'posy': 0, 'movx': 0,
+                'movy': 0, 'lookx': 0, 'looky': 0}
         self.on_update = None
 
     # Método implementado da superclasse. Os dados recebidos são os atributos
@@ -155,7 +157,7 @@ class You(Player):
         f = open(filename)
         self.script = f.read()
         f.close()
-        self.script_lock = threading.Semaphore()
+        self.script_lock = threading.Lock()
 
     # Cria o nosso jogador. Como o construtor recebeu '/game', adiciona o token
     # ao caminho.
@@ -166,21 +168,25 @@ class You(Player):
         response.close()
         self.resource += '/' + self.token
 
+    # Atira.
+    def shoot(self):
+        data = {'password': self.password}
+        response = new_request(self.host, 'POST', self.resource, data)
+
     # Executa o script, expondo uma cópia dos atributos dos jogador e os outros
     # jogadores.  Ao final, se foram feitas modificações nos atributos, pede ao
     # servidor para atualizá-las.
     def execute(self, other_players):
-        self.script_lock.acquire()
+        with self.script_lock:
+            attributes = self.attributes.copy()
+            exec(self.script, {'attributes': attributes, 'shoot': self.shoot,
+                'players': other_players})
 
-        attributes = copy.deepcopy(self.attributes)
-        exec(self.script, {'attributes': attributes, 'players': other_players})
-
-        for i, j in attributes.items():
-            if self.attributes[i] != j:
-                self.refresh(attributes)
-                break
-
-        self.script_lock.release()
+            for i, j in attributes.items():
+                if self.attributes[i] != j:
+                    threading.Thread(target=self.refresh,
+                            kwargs={'data': attributes}).start()
+                    break
 
     # Informa o servidor sobre o novo estado do jogador.
     def refresh(self, data):
@@ -221,7 +227,7 @@ class Curses:
 
     # Desenha a tela. 
     def draw(self):
-        self.add_message(str(time.time()))
+        self.add_message(str(self.game.you.attributes))
 
         self.draw_lock.acquire()
 
@@ -243,7 +249,6 @@ class Curses:
 
     # Desenha os personagens na tela.
     def draw_players(self):
-        self.window.addstr(self.y, self.x, '@')
         for p in self.game.players.values():
             x = self.x + p.attributes['posx'] - self.game.you.attributes['posx']
             y = self.y + p.attributes['posy'] - self.game.you.attributes['posy']
@@ -251,6 +256,7 @@ class Curses:
                 y not in range(0, self.window_height)):
                 continue
             self.window.addstr(y, x, '#')
+        self.window.addstr(self.y, self.x, '@')
 
     # Desenha o status do jogador.
     def draw_status(self):
