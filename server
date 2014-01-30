@@ -346,10 +346,10 @@ class Player(Monitor):
     # Atualiza dados e dispara notificação caso haja mudanças.
     def update(self, data):
         changes = False
-        for i, j in data.items():
-            if i not in self.attributes or j != self.attributes[i]:
-                changes = True
         with self.lock:
+            for i, j in data.items():
+                if i not in self.attributes or j != self.attributes[i]:
+                    changes = True
             self.attributes.update(data)
         if changes:
             self.notify()
