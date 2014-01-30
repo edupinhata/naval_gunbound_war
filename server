@@ -129,18 +129,22 @@ class Resource:
         self.on_delete = None
         self.on_add_sibling = None
         self.default_reply = default_reply
+        self.lock = threading.Lock()
 
     # Adiciona um recurso filho dado um nome do recurso, que é o caminho
     # relativo ao caminho deste recurso. Também faz com que, ao chamar o método
     # delete(), chame o método delete_child() deste objeto.
     def add_child(self, name, resource):
-        self.children[name] = resource
-        resource.on_delete = functools.partial(self.delete_child, name)
+        with self.lock:
+            self.children[name] = resource
         resource.on_add_sibling = self.add_child
+        resource.on_delete = functools.partial(self.delete_child, name)
 
     # Delete um recurso filho.
     def delete_child(self, name):
-        self.children.pop(name)
+        with self.lock:
+            if name in self.children:
+                self.children.pop(name)
 
     # Adiciona um recurso irmão, chamando a função on_add_sibling, geralmente
     # setada pelo recurso pai no método add_child().
@@ -205,7 +209,8 @@ class Container(Monitor):
     # Implementado da superclasse. Retorna uma lista do caminho relativo de
     # cada recurso filho.
     def get_data(self):
-        return [name for name in self.children.copy()]
+        with self.lock:
+            return [name for name in self.children]
 
     # Ao adicionar um recurso filho, notifica por atualizações.
     def add_child(self, path, resource):
@@ -254,10 +259,16 @@ class Game(Container, threading.Thread):
         while True:
             time.sleep(self.time_step)
 
+            with self.lock:
+                players = self.children.copy().values()
             occupied = self.get_occupied()
-            for p in self.children.values():
-                oldx, oldy = p.attributes['posx'], p.attributes['posy']
-                x, y = oldx + p.attributes['movx'], oldy + p.attributes['movy']
+
+            for p in players:
+                p.update_event.set()
+
+                oldx, oldy = p.get_data()['posx'], p.get_data()['posy']
+                x, y = oldx + p.get_data()['movx'], oldy + p.get_data()['movy']
+
                 if x == oldx and y == oldy:
                     continue
 
@@ -268,12 +279,15 @@ class Game(Container, threading.Thread):
                     occupied[x][y] = p
                     p.update({'posx': x, 'posy': y})
 
+                p.update_event.clear()
+
     # Retorna um dicionário que mapeia para cada X um dicionário. Este mapeia,
     # para cada Y, um jogador. Substitui uma matriz.
     def get_occupied(self):
         d = collections.defaultdict(dict)
-        d.update({p.attributes['posx']: {p.attributes['posy']: p}
-                  for p in self.children.values()})
+        with self.lock:
+            d.update({p.get_data()['posx']: {p.get_data()['posy']: p}
+                      for p in self.children.values()})
         return d
 
 
@@ -285,14 +299,16 @@ class Player(Monitor):
         Monitor.__init__(self)
         self.password = password
         self.attributes = data
+        self.update_event = threading.Event()
         self.update({'hp': 10, 'kills': 0,
             'posx': random.randrange(0, 10), 'posy': random.randrange(0, 10),
-            'movx': 0, 'movy': 0, 'lookx': 0, 'looky': 0})
+            'movx': 0, 'movy': 0, 'lookx': 1, 'looky': 1})
 
     # Implementado da superclasse. Uma requisição GET retorna os atributos do
     # jogador.
     def get_data(self):
-        return self.attributes
+        with self.lock:
+            return self.attributes
 
     # Valida dados de entrada e chama atualização. Aceita apenas modificações
     # em movement e look, cujos valores devem ser entre -1 e 1.
@@ -302,9 +318,11 @@ class Player(Monitor):
         if data['password'] != self.password:
             return {'code': http.client.FORBIDDEN}
 
+        self.update_event.wait()
+
         accepted = ['movx', 'movy', 'lookx', 'lookx']
         self.update({k: v for k, v in data.items()
-                     if k in accepted and v in range(-1, 1)})
+                     if k in accepted})
 
         return {'code': http.client.ACCEPTED}
 
@@ -315,11 +333,15 @@ class Player(Monitor):
         if data['password'] != self.password:
             return {'code': http.client.FORBIDDEN}
 
+        self.update_event.wait()
+
         p = Projectile(self.attributes['posx'], self.attributes['posy'],
                 self.attributes['lookx'], self.attributes['looky'])
 
         token = hashlib.md5(os.urandom(4096)).hexdigest()
         self.add_sibling(token, p)
+
+        return {}
 
     # Atualiza dados e dispara notificação caso haja mudanças.
     def update(self, data):
@@ -327,7 +349,8 @@ class Player(Monitor):
         for i, j in data.items():
             if i not in self.attributes or j != self.attributes[i]:
                 changes = True
-        self.attributes.update(data)
+        with self.lock:
+            self.attributes.update(data)
         if changes:
             self.notify()
 
@@ -350,8 +373,8 @@ class Projectile(Player):
     # Construtor. Recebe a posição de origem, e a direção na qual o projétil
     # deve se mover.
     def __init__(self, posx, posy, lookx, looky):
-        Player.__init__(self, None, '')
-        self.attributes.update({'hp': 1, name: 'Projectile',
+        Player.__init__(self, {}, '')
+        self.attributes.update({'hp': 1, 'name': 'Projectile',
             'posx': posx + lookx, 'posy': posy + looky,
             'movx': lookx, 'movy': looky, 'lookx': lookx, 'looky': looky})
 
@@ -360,12 +383,20 @@ class Projectile(Player):
     def do_PUT(self, data):
         return self.default_reply
 
-    # Sobrescrito da superclasse. Um projétil que colide com outro jogador
+    # Sobrescrito. Um projétil que colide com outro jogador
     # reduz o HP daquele.
     def collide(self, player):
         Player.collide(self, player)
         player.damage()
         self.delete()
+
+    # Sobrescrito.
+    def update(self, data):
+        Player.update(self, data)
+        d = self.get_data()
+        for i in ['posx', 'posy']:
+            if d[i] not in range(-10, 11):
+                self.delete()
 
 
 # Main.
