@@ -1,16 +1,18 @@
-posx = attributes['posx']
-posy = attributes['posy']
-movx = attributes['movx']
-movy = attributes['movy']
+import random
 
-def move(x=movx, y=movy):
-    attributes['movx'] = x
-    attributes['movy'] = y
+if attributes['posx'] <= -10:
+    attributes['movx'] = 1
+elif attributes['posx'] >= 10:
+    attributes['movx'] = -1
+else:
+    attributes['movx'] = random.randrange(-1, 2)
 
+if attributes['posy'] <= -10:
+    attributes['movy'] = 1
+elif attributes['posy'] >= 10:
+    attributes['movy'] = -1
+else:
+    attributes['movy'] = random.randrange(-1, 2)
 
-if movx == 0 and movy == 0:
-    move(1, 1)
-elif posx <= -10 and posy <= -10:
-    move(1, 1)
-elif posx >= 10 and posy >= 10:
-    move(-1, -1)
+if random.randrange(0, 2) == 1:
+    shoot()
