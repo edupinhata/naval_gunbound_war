@@ -265,20 +265,7 @@ class Game(Container, threading.Thread):
 
             for p in players:
                 p.update_event.set()
-
-                oldx, oldy = p.get_data()['posx'], p.get_data()['posy']
-                x, y = oldx + p.get_data()['movx'], oldy + p.get_data()['movy']
-
-                if x == oldx and y == oldy:
-                    continue
-
-                if x in occupied and y in occupied[x]:
-                    p.collide(occupied[x][y])
-                    occupied[x][y].collide(p)
-                else:
-                    occupied[x][y] = p
-                    p.update({'posx': x, 'posy': y})
-
+                p.move(occupied)
                 p.update_event.clear()
 
     # Retorna um dicionário que mapeia para cada X um dicionário. Este mapeia,
@@ -353,6 +340,32 @@ class Player(Monitor):
             self.attributes.update(data)
         if changes:
             self.notify()
+
+    # Método que move o jogador. Recebe um dicionário de dicionários
+    # substituindo uma matriz, para verificar se já existem jogadores no
+    # destino. Se houver, colisões devem ser tratadas.
+    def move(self, occupied):
+        with self.lock:
+            a = self.attributes
+            oldx, oldy = a['posx'], a['posy']
+            movx, movy = a['movx'], a['movy']
+            lookx, looky = a['lookx'], a['looky']
+
+            x, y = oldx + movx, oldy + movy
+            if x == oldx and y == oldy:
+                return
+
+            if lookx == movx:
+                x += 1
+            if looky == movy:
+                y += 1
+
+        if x in occupied and y in occupied[x]:
+            self.collide(occupied[x][y])
+            occupied[x][y].collide(self)
+        else:
+            occupied[x][y] = self
+            self.update({'posx': x, 'posy': y})
 
     # Método que trata colisão com outro jogador. Um jogador que colide apenas
     # pára de se mover.
