@@ -51,6 +51,7 @@ Obtém os atributos correspondentes a um jogador.
 * Código de retorno: `200 OK`
 * Saída: Objeto
  * `name`: string
+ * `type`: string
  * `hp`: int
  * `kills`: int
  * `posx`: int
@@ -63,7 +64,7 @@ Obtém os atributos correspondentes a um jogador.
 
 ```sh
 $ curl --request GET localhost:8000/game/abc123
-{"name": "top", "lookx": 0, "looky": 0, "movx": 0, "movy": 0, "posx": 0, "posy": 0, "hp": 10, "kills": 0}
+{"name": "top", "type": "player", "lookx": 0, "looky": 0, "movx": 0, "movy": 0, "posx": 0, "posy": 0, "hp": 10, "kills": 0}
 $ curl --request GET --header 'If-Modified-Since: Mon, 01 Jan 2199 00:00:00 GMT' localhost:8000/game/abc123
 # bloqueia até ter atualização
 ```
@@ -87,7 +88,7 @@ para criação.
 ```sh
 $ curl --request PUT --data '{"password": "kek", "lookx": 1, "movy": -1}' localhost:8000/game/abc123
 $ curl --request GET localhost:8000/game/abc123
-{"name": "top", "lookx": 1, "looky": 0, "movx": 0, "movy": -1, "posx": 0, "posy": 0, "hp": 10, "kills": 0}
+{"name": "top", "type": "player", "lookx": 1, "looky": 0, "movx": 0, "movy": -1, "posx": 0, "posy": 0, "hp": 10, "kills": 0}
 ```
 
 ### POST /game/[token]
@@ -105,7 +106,7 @@ $ curl --request POST --data '{"password": "kek"}' localhost:8000/game/abc123
 # ...
 < Location: ghi789
 $ curl --request GET localhost:8000/game/ghi789
-{"name": "Projectile", "lookx": 1, "looky": 0, "movx": 1, "movy": 0, "posx": 1, "posy": 0, "hp": 1, "kills": 0}
+{"name": "Projectile", "type": "projectile", "lookx": 1, "looky": 0, "movx": 1, "movy": 0, "posx": 1, "posy": 0, "hp": 1, "kills": 0}
 ```
 
 ### GET /game
