@@ -38,9 +38,10 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
         res = self.root
         for name in path_list:
-            if name not in res.children:
+            try:
+                res = res.children[name]
+            except KeyError:
                 return self.not_found
-            res = res.children[name]
         return res
 
 
@@ -133,40 +134,45 @@ class Resource:
 
     # Adiciona um recurso filho dado um nome do recurso, que é o caminho
     # relativo ao caminho deste recurso. Também faz com que, ao chamar o método
-    # delete(), chame o método delete_child() deste objeto.
+    # delete(), chame o método delete_child() deste objeto. É thread-safe pois
+    # todas as operações são realizadas dentro de blocos de exclusão mútua.
     def add_child(self, name, resource):
         with self.lock:
             self.children[name] = resource
-        resource.on_add_sibling = self.add_child
-        resource.on_delete = functools.partial(self.delete_child, name)
+        with resource.lock:
+            resource.on_add_sibling = self.add_child
+            resource.on_delete = functools.partial(self.delete_child, name)
 
-    # Delete um recurso filho.
+    # Delete um recurso filho. É thread-safe pois a operação é realizada dentro
+    # de um bloco de exclusão mútua.
     def delete_child(self, name):
         with self.lock:
             if name in self.children:
                 self.children.pop(name)
 
     # Adiciona um recurso irmão, chamando a função on_add_sibling, geralmente
-    # setada pelo recurso pai no método add_child().
+    # setada pelo recurso pai no método add_child(). O método setado deve ser
+    # thread-safe.
     def add_sibling(self, name, resource):
         if self.on_add_sibling:
             self.on_add_sibling(name, resource)
 
     # Deleta este recurso. Se tiver sido adicionado a um recurso pai através de
-    # add_child(), chamará o método dele para remover este recurso.
+    # add_child(), chamará o método dele para remover este recurso, que é
+    # thread-safe.
     def delete(self):
         if self.on_delete:
             self.on_delete()
 
-    # Trata uma requisição GET.
+    # Trata uma requisição GET. É thread-safe pois default_reply é imutável.
     def do_GET(self, data):
         return self.default_reply
 
-    # Trata uma requisição POST.
+    # Trata uma requisição POST. É thread-safe pois default_reply é imutável.
     def do_POST(self, data):
         return self.default_reply
 
-    # Trata uma requisição PUT.
+    # Trata uma requisição PUT. É thread-safe pois default_reply é imutável.
     def do_PUT(self, data):
         return self.default_reply
 
@@ -183,21 +189,26 @@ class Monitor(Resource):
         self.update_event = threading.Event()
 
     # Trata uma requisição GET, bloqueando se for necessário. Após a liberação,
-    # retorna os dados do recurso.
+    # retorna os dados do recurso. É thread-safe pois acessa o timestamp dentro
+    # de um bloco de exclusão mútua. get_data() deve ser thread-safe.
     def do_GET(self, data):
+        with self.lock:
+            timestamp = self.timestamp
         if data['timestamp'] >= self.timestamp:
             self.update_event.wait()
         return {'data': self.get_data(),
                 'headers': [('Last-Modified',
                              email.utils.formatdate(self.timestamp))]}
 
-    # Atualiza o timestamp e dispara o evento sinalizando atualização.
+    # Atualiza o timestamp e dispara o evento sinalizando atualização. É
+    # thread-safe pois tudo é realizado dentro de um bloco de exclusão mútua.
     def notify(self):
-        self.timestamp = time.time()
-        self.update_event.set()
-        self.update_event.clear()
+        with self.lock:
+            self.timestamp = time.time()
+            self.update_event.set()
+            self.update_event.clear()
 
-    # Método abstrato que obtém os dados do recurso.
+    # Método abstrato que obtém os dados do recurso. Deve ser thread-safe.
     def get_data(self):
         return None
 
@@ -207,12 +218,14 @@ class Monitor(Resource):
 class Container(Monitor):
 
     # Implementado da superclasse. Retorna uma lista do caminho relativo de
-    # cada recurso filho.
+    # cada recurso filho. É thread-safe pois acessos estão em um bloco de
+    # exclusão mútua, e retorna uma nova lista.
     def get_data(self):
         with self.lock:
             return [name for name in self.children]
 
-    # Ao adicionar um recurso filho, notifica por atualizações.
+    # Ao adicionar um recurso filho, notifica por atualizações. É thread-safe
+    # pois Resource.add_child() e Resource.notify() são.
     def add_child(self, path, resource):
         Resource.add_child(self, path, resource)
         self.notify()
@@ -234,7 +247,8 @@ class Game(Container, threading.Thread):
         self.time_step = time_step
 
     # Cria um recurso filho (um jogador), validando dados de entrada. Como o
-    # conjunto de jogadores foi alterado, dispara notificação ao final.
+    # conjunto de jogadores foi alterado, dispara notificação ao final. É
+    # thread-safe pois o método add_child é.
     def do_POST(self, data):
         if 'password' not in data:
             return {'code': http.client.EXPECTATION_FAILED}
@@ -253,28 +267,33 @@ class Game(Container, threading.Thread):
                 'headers': [('Location', token)]}
 
 
-    # Sobrescrito de Thread. Executa a lógica do jogo e envia notificações em
-    # seguida, repetidamente. Trata colisões.
+    # Sobrescrito de Thread. Em cada jogador, dispara o evento update_event,
+    # chama a função move de cada jogador, fornecendo um dicionário de posições
+    # ocupadas por outros jogadores. O próprio jogador então trata colisões com
+    # outros. É thread-safe pois acesso aos jogadores é feito em um bloco de
+    # exclusão mútua, e Player.move() é.
     def run(self):
         while True:
             time.sleep(self.time_step)
 
+            occupied = self.get_occupied()
             with self.lock:
                 players = self.children.copy().values()
-            occupied = self.get_occupied()
 
             for p in players:
                 p.update_event.set()
-                p.move(occupied)
                 p.update_event.clear()
+                p.move(occupied)
 
     # Retorna um dicionário que mapeia para cada X um dicionário. Este mapeia,
-    # para cada Y, um jogador. Substitui uma matriz.
+    # para cada Y, um jogador. Substitui uma matriz. É thread-safe pois acesso
+    # aos jogadores é feito em um bloco de exclusão mútua e Player.get_data()
+    # é.
     def get_occupied(self):
         d = collections.defaultdict(dict)
         with self.lock:
             d.update({p.get_data()['posx']: {p.get_data()['posy']: p}
-                      for p in self.children.values()})
+                      for p in self.children.copy().values()})
         return d
 
 
@@ -292,13 +311,18 @@ class Player(Monitor):
             'movx': 0, 'movy': 0, 'lookx': 1, 'looky': 1})
 
     # Implementado da superclasse. Uma requisição GET retorna os atributos do
-    # jogador.
+    # jogador. É thread-safe pois usa exclusão mútua, e retorna uma cópia dos
+    # atributos.
     def get_data(self):
         with self.lock:
-            return self.attributes
+            return self.attributes.copy()
 
     # Valida dados de entrada e chama atualização. Aceita apenas modificações
-    # em movement e look, cujos valores devem ser entre -1 e 1.
+    # em movement e look, cujos valores devem ser entre -1 e 1. As mudanças só
+    # são aplicadas quando o evento update_event for disparado, para evitar
+    # recursão infinita de atualização no servidor -> atualização no cliente ->
+    # mudança no cliente -> atualização no servidor... É thread-safe pois
+    # update() é.
     def do_PUT(self, data):
         if 'password' not in data:
             return {'code': http.client.EXPECTATION_FAILED}
@@ -313,7 +337,9 @@ class Player(Monitor):
 
         return {'code': http.client.ACCEPTED}
 
-    # Cria um novo recurso a partir de um jogador, ou seja, um tiro.
+    # Cria um novo recurso a partir de um jogador, ou seja, um tiro. Também
+    # depende do evento update_event. É thread-safe pois get_data() e
+    # Resource.add_sibling() são.
     def do_POST(self, data):
         if 'password' not in data:
             return {'code': http.client.EXPECTATION_FAILED}
@@ -322,43 +348,48 @@ class Player(Monitor):
 
         self.update_event.wait()
 
-        p = Projectile(self.attributes['posx'], self.attributes['posy'],
-                self.attributes['lookx'], self.attributes['looky'])
+        d = self.get_data()
+        p = Projectile(d['posx'], d['posy'], d['lookx'], d['looky'])
 
         token = hashlib.md5(os.urandom(4096)).hexdigest()
         self.add_sibling(token, p)
 
         return {}
 
-    # Atualiza dados e dispara notificação caso haja mudanças.
+    # Atualiza dados e dispara notificação caso haja mudanças. É thread-safe
+    # pois a modificação está dentro de um bloco de exclusão mútua, e
+    # get_data() e Monitor.notify() são.
     def update(self, data):
         changes = False
-        with self.lock:
-            for i, j in data.items():
-                if i not in self.attributes or j != self.attributes[i]:
-                    changes = True
-            self.attributes.update(data)
+
+        a = self.get_data()
+        for i, j in data.items():
+            if i not in a or j != a[i]:
+                changes = True
+
         if changes:
+            with self.lock:
+                self.attributes.update(data)
             self.notify()
 
     # Método que move o jogador. Recebe um dicionário de dicionários
     # substituindo uma matriz, para verificar se já existem jogadores no
-    # destino. Se houver, colisões devem ser tratadas.
+    # destino. Se houver, colisões devem ser tratadas. É thread-safe pois
+    # get_data, collide e update() são.
     def move(self, occupied):
-        with self.lock:
-            a = self.attributes
-            oldx, oldy = a['posx'], a['posy']
-            movx, movy = a['movx'], a['movy']
-            lookx, looky = a['lookx'], a['looky']
+        a = self.get_data()
+        oldx, oldy = a['posx'], a['posy']
+        movx, movy = a['movx'], a['movy']
+        lookx, looky = a['lookx'], a['looky']
 
-            x, y = oldx + movx, oldy + movy
-            if x == oldx and y == oldy:
-                return
+        x, y = oldx + movx, oldy + movy
+        if x == oldx and y == oldy:
+            return
 
-            if lookx == movx:
-                x += 1
-            if looky == movy:
-                y += 1
+        if lookx == movx:
+            x += 1
+        if looky == movy:
+            y += 1
 
         if x in occupied and y in occupied[x]:
             self.collide(occupied[x][y])
@@ -368,11 +399,12 @@ class Player(Monitor):
             self.update({'posx': x, 'posy': y})
 
     # Método que trata colisão com outro jogador. Um jogador que colide apenas
-    # pára de se mover.
+    # pára de se mover. É thread-safe pois Player.update() é.
     def collide(self, player):
         self.update({'movx': 0, 'movy': 0})
 
-    # Computa dano ao jogador. Se chegar a 0, morre.
+    # Computa dano ao jogador. Se chegar a 0, morre. É thread-safe pois
+    # Player.update() e Resource.delete() são.
     def damage(self):
         self.update({'hp': self.attributes['hp'] - 1})
         if self.attributes['hp'] < 1:
@@ -384,26 +416,31 @@ class Player(Monitor):
 class Projectile(Player):
 
     # Construtor. Recebe a posição de origem, e a direção na qual o projétil
-    # deve se mover.
+    # deve se mover. É posicionado um passo à frente, para não coincidir com o
+    # jogador que o atirou.
     def __init__(self, posx, posy, lookx, looky):
         Player.__init__(self, {}, '')
         self.attributes.update({'hp': 1, 'name': 'Projectile',
             'posx': posx + lookx, 'posy': posy + looky,
             'movx': lookx, 'movy': looky, 'lookx': lookx, 'looky': looky})
 
-    # Sobrescrito da superclasse. Um projétil não pode ter seu estado
-    # alterado explicitamente por qualquer cliente.
+    # Sobrescrito de Player. Um projétil não pode ter seu estado alterado
+    # explicitamente por qualquer cliente. É thread-safe pois default_reply é
+    # imutável.
     def do_PUT(self, data):
         return self.default_reply
 
-    # Sobrescrito. Um projétil que colide com outro jogador
-    # reduz o HP daquele.
+    # Sobrescrito de Player. Um projétil que colide com outro jogador reduz o
+    # HP daquele, e se deleta. É thread-safe pois Player.damage() e
+    # Resource.delete() são.
     def collide(self, player):
         Player.collide(self, player)
         player.damage()
         self.delete()
 
-    # Sobrescrito.
+    # Sobrescrito de Player. É thread-safe pois Monitor.get_data() e
+    # Resource.delete() são. #TODO fazer com que projétil tenha duração de
+    # tempo.
     def update(self, data):
         Player.update(self, data)
         d = self.get_data()
