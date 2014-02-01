@@ -276,10 +276,10 @@ class Curses:
         self.status.erase()
         try: self.status.addstr(1, 1, '░░░░░░░░░░')
         except curses.error: pass
-        try self.status.addnstr(1, 1, '██████████', self.game.you.attributes['hp'])
+        try: self.status.addnstr(1, 1, '██████████', self.game.you.attributes['hp'])
         except curses.error: pass
-        try self.status.addnstr(0, 1, self.game.you.attributes['name'], 10)
-    except curses.error: pass
+        try: self.status.addnstr(0, 1, self.game.you.attributes['name'], 10)
+        except curses.error: pass
 
     # Desenha o log de mensagens. #TODO deprecado por uso de scripts.
     def draw_log(self):
