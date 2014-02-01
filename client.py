@@ -274,7 +274,8 @@ class Curses:
     # Desenha o status do jogador.
     def draw_status(self):
         self.status.erase()
-        self.status.addstr(1, 1, '░░░░░░░░░░')
+        try: self.status.addstr(1, 1, '░░░░░░░░░░')
+        except curses.error: pass
         self.status.addnstr(1, 1, '██████████', self.game.you.attributes['hp'])
         self.status.addnstr(0, 1, self.game.you.attributes['name'], 10)
 
