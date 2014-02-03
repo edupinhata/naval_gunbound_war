@@ -1,0 +1,205 @@
+% Compilado com "latexmk -pdf" e "latexmk -C" para limpar, do pacote "latexmk".
+
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazilian,brazil]{babel}
+\usepackage[labelfont=bf]{caption}
+\usepackage{indentfirst}
+\linespread{1.5}
+\setlength{\parindent}{1.3cm}
+\setlength{\parskip}{0.2cm}
+
+\begin{document}
+
+\pagestyle{plain}
+
+\begin{titlepage}
+\begin{center}
+	\textbf{{\large Universidade Federal do ABC -- UFABC}}
+
+	\textbf{\large Sistemas Distribuídos}
+	\vfill
+	\textit{\Large Projeto Final - [nome]}
+	\vfill
+	\begin{flushright}
+		\textbf{\large Eduardo Pinhata}
+
+		\textbf{\large Ricardo Liang}
+
+		\textbf{\large Vanessa Morita}
+	\end{flushright}
+	\vfill
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+
+\pagebreak \section{Introdução}
+
+Este projeto tem como objetivo desenvolver um jogo 2D \textit{multiplayer} de
+tiros automatizável (\textit{scriptable}) por cada jogador. O protocolo de
+comunicação é construído em cima do \textit{HTTP}, buscando-se seguir
+princípios \textit{RESTful} no seu desenvolvimento.
+
+\subsection{Mecânicas do Jogo}
+
+Cada objeto do jogo, incluindo jogadores, são compostos por um conjunto de
+atributos.
+
+\subsubsection{\texttt{name}}
+
+Nome do objeto.
+
+\subsubsection{\texttt{password}}
+
+Senha do objeto. Deve-se requisitá-la a um cliente que deseje fazer
+alterações nos atributos.
+
+\subsubsection{\texttt{type}}
+
+Tipo do objeto. Pode ser \texttt{player} ou \texttt{projectile}.
+
+\subsubsection{\texttt{hp}}
+
+Vida de um objeto. Se chega a zero, o objeto é removido do jogo.
+
+\subsubsection{\texttt{posx}, \texttt{posy}}
+
+Representa a posição do objeto no espaço 2D. É desejável que dois objetos não
+ocupem o mesmo espaço, e um servidor deve tratar tentativas de tais
+ocorrências. Se um objeto \texttt{projectile} coincidir em posição com outro
+objeto, deve reduzir seu \texttt{hp} e ser removido do jogo em seguida.
+
+\subsubsection{\texttt{movx}, \texttt{movy}}
+
+Representa a direção de movimento do jogador no espaço 2D. Um servidor deve, em
+princípio, somar \texttt{movx} a \texttt{posx} e \texttt{movy} a \texttt{posy}
+para movimentar um objeto.
+
+\subsubsection{\texttt{lookx}, \texttt{looky}}
+
+A direção para a qual o objeto está ``olhando''. É usado também para determinar
+a direção na qual tiros feitos por jogadores irão se mover. Também pode ser
+usado para implementar movimento lateral, neste caso penalizando a mobilidade.
+
+\pagebreak \section{Servidor}
+
+Uma \textit{API RESTful} representa recursos em um servidor através de
+\textit{URL}s. De forma geral, o método \texttt{GET} obtém os dados de um
+recurso, o método \texttt{POST} cria um recurso, e o método \texttt{PUT} altera
+um recurso.
+
+Cada objeto do jogo é um recurso, com sua \textit{URL} única. Estão contidos no
+recurso \texttt{/game}, sendo da forma \texttt{/game/[string aleatória]}. Cada
+cliente deve-se manter atualizado fazendo requisições repetidamente a
+\texttt{/game} pela lista de \textit{URL}s de objetos, e também, à \textit{URL}
+de cada objeto.
+
+Para evitar sobrecarga na rede, recursos acessados pelo método GET bloqueiam a
+requisição se o cabeçalho tiver o campo \texttt{If-Modified-Since},
+especificando uma data igual ou superior ao \texttt{timestamp} de modificação
+do recurso.
+
+\subsection{Entradas e Saídas}
+
+Uma entrada é o corpo do pacote de requisição e uma saída é o corpo do pacote
+de resposta. Todas entradas e saídas são em formato JSON, podendo ser objetos
+(encapsulados por ``\texttt{\{\}}'') ou vetores (encapsulados por
+``\texttt{[]}'') de variados atributos dependendo do recurso e do método.
+
+\subsection{Recursos e Métodos}
+
+\subsubsection{\texttt{POST /game}}
+
+Cria um recurso \texttt{[token]} no servidor correspondente a um jogador. É
+acessível através de \texttt{/game/[token]}, que é retornado no campo
+\texttt{Location} do cabeçalho HTTP de retorno. Requer uma senha para que o
+criador faça modificações depois.
+
+\begin{itemize}
+	\item Entrada: Objeto
+		\begin{itemize}
+			\item \texttt{name}: string, opcional
+			\item \texttt{password}: string
+		\end{itemize}
+	\item Código de retorno: \texttt{201 Created}
+	\item Saída: Nenhum
+\end{itemize}
+
+\subsubsection{\texttt{GET /game/[token]}}
+
+Obtém os atributos correspondentes a um jogador.
+
+\begin{itemize}
+	\item Entrada: Nenhum
+	\item Código de retorno: \texttt{200 OK}
+	\item Saída: Objeto
+		\begin{itemize}
+			\item \texttt{name}: string
+			\item \texttt{type}: string
+			\item \texttt{hp}: int
+			\item \texttt{kills}: int
+			\item \texttt{posx}: int
+			\item \texttt{posy}: int
+			\item \texttt{movx}: int
+			\item \texttt{movy}: int
+			\item \texttt{lookx}: int
+			\item \texttt{looky}: int
+		\end{itemize}
+\end{itemize}
+
+\subsubsection{\texttt{PUT /game/[token]}}
+
+Atualiza, do jogador, atributos passados como entrada. Requer a senha usada
+para criação.
+
+\begin{itemize}
+	\item Entrada: Objeto
+		\begin{itemize}
+			\item \texttt{password}: string
+			\item \texttt{movement}: Objeto, opcional
+			\item \texttt{movx}: int, opcional
+			\item \texttt{movy}: int, opcional
+			\item \texttt{lookx}: int, opcional
+			\item \texttt{looky}: int, opcional
+		\end{itemize}
+	\item Código de retorno: \texttt{202 Accepted}
+	\item Saída: Nenhum
+\end{itemize}
+
+\subsubsection{\texttt{POST /game/[token]}}
+
+Cria um recurso em \texttt{/game} que representa um projétil atirado pelo
+jogador.
+
+\begin{itemize}
+	\item Entrada: Objeto
+		\begin{itemize}
+			\item \texttt{password}: string
+		\end{itemize}
+	\item Código de retorno: \texttt{201 Created}
+	\item Saída: Nenhum
+\end{itemize}
+
+\subsubsection{\texttt{GET /game}}
+
+Obtém todos os \texttt{[token]}s representando cada jogador presente.
+
+\begin{itemize}
+	\item Entrada: Nenhum
+	\item Código de retorno: \texttt{200 OK}
+	\item Saída: Vetor: string
+\end{itemize}
+
+\pagebreak \section{Cliente}
+
+\pagebreak \section{Resultados}
+
+\pagebreak \section{Conclusão}
+
+%\bibliographystyle{}
+%\bibliography{}
+
+\end{document}
