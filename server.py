@@ -269,11 +269,11 @@ class Game(Container, threading.Thread):
                 'headers': [('Location', token)]}
 
 
-    # Sobrescrito de Thread. Em cada jogador, dispara o evento update_event,
-    # chama a função move de cada jogador, fornecendo um dicionário de posições
-    # ocupadas por outros jogadores. O próprio jogador então trata colisões com
-    # outros. É thread-safe pois acesso aos jogadores é feito em um bloco de
-    # exclusão mútua, e Player.move() é.
+    # Sobrescrito de Thread. Executa operações pendentes e chama o método move
+    # de cada jogador, fornecendo um dicionário de posições ocupadas por outros
+    # jogadores. O próprio jogador então trata colisões com outros. É
+    # thread-safe pois acesso aos jogadores é feito em um bloco de exclusão
+    # mútua, e Player.move() é.
     def run(self):
         while True:
             time.sleep(self.time_step)
@@ -298,7 +298,9 @@ class Game(Container, threading.Thread):
         return d
 
 
-# Um jogador monitora seu estado, que é um conjunto de atributos.
+# Um jogador monitora seu estado, que é um conjunto de atributos. Quando
+# requisições PUT ou POST são feitas, são setadas como pendentes até que o
+# servidor dê o seu passo, para evitar sobrecarga de processamento.
 class Player(Monitor):
 
     # Construtor. Recebe uma senha para modificações.
@@ -331,7 +333,7 @@ class Player(Monitor):
         if data['password'] != self.password:
             return {'code': http.client.FORBIDDEN}
 
-        accepted = ['movx', 'movy', 'lookx', 'lookx']
+        accepted = ['movx', 'movy', 'lookx', 'looky']
         with self.lock:
             self.pending_put = {k: v for k, v in data.items()
                     if k in accepted and v in range(-1, 2)}
@@ -347,11 +349,8 @@ class Player(Monitor):
         if data['password'] != self.password:
             return {'code': http.client.FORBIDDEN}
 
-        #self.update_event.wait()
-
         p = Projectile(self)
         token = hashlib.md5(os.urandom(4096)).hexdigest()
-        #self.add_sibling(token, p)
         with self.lock:
             self.pending_post = (token, p)
 
@@ -402,8 +401,8 @@ class Player(Monitor):
     def collide(self, player):
         self.update({'movx': 0, 'movy': 0})
 
-    # Computa dano ao jogador. Se chegar a 0, morre. É thread-safe pois
-    # Player.update() e Resource.delete() são.
+    # Computa dano ao jogador, vindo de outro. Se chegar a 0, morre. É
+    # thread-safe pois Player.update() e Resource.delete() são.
     def damage(self):
         self.update({'hp': self.attributes['hp'] - 1})
         if self.attributes['hp'] < 1:
@@ -457,11 +456,13 @@ class Projectile(Player):
     # HP daquele, e se deleta. É thread-safe pois Player.damage() e
     # Resource.delete() são.
     def collide(self, player):
-        if player.get_data()['type'] == 'projectile':
+        d = player.get_data()
+        if d['type'] == 'projectile':
             return
         player.damage()
-        with self.player.lock:
-            self.player.attributes['kills'] += 1
+        if d['hp'] < 1:
+            with self.player.lock:
+                self.player.attributes['kills'] += 1
         self.delete()
 
     # Sobrescrito de Player. É thread-safe pois Monitor.get_data() e

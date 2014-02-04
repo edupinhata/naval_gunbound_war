@@ -97,10 +97,10 @@ cliente deve-se manter atualizado fazendo requisições repetidamente a
 \texttt{/game} pela lista de \textit{URL}s de objetos, e também, à \textit{URL}
 de cada objeto.
 
-Para evitar sobrecarga na rede, recursos acessados pelo método GET bloqueiam a
-requisição se o cabeçalho tiver o campo \texttt{If-Modified-Since},
-especificando uma data igual ou superior ao \texttt{timestamp} de modificação
-do recurso.
+Para evitar sobrecarga na rede por espera ocupada, recursos acessados pelo
+método GET bloqueiam a requisição se o cabeçalho tiver o campo
+\texttt{If-Modified-Since}, especificando uma data igual ou superior ao
+\texttt{timestamp} de modificação do recurso.
 
 \subsection{Entradas e Saídas}
 
