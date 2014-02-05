@@ -6,7 +6,6 @@ import http.client
 import email.utils
 import collections
 import threading
-import functools
 import argparse
 import hashlib
 import random
@@ -143,9 +142,10 @@ class Resource:
     # Adiciona um recurso filho. Se não especificado o URN desejado para o
     # recurso, usa-se um aleatório. Também modifica o recurso para que seu
     # ponteiro-para-função on_delete aponte para o método delete_child deste
-    # objeto, e on_add_sibling para add_child. Assim, o recurso chamar delete
-    # fará com que este objeto o remova dos recursos filhos, e chamar
-    # add_sibling fará com que este adicione um recurso filho.
+    # objeto (com o argumento apropriado), e on_add_sibling para add_child.
+    # Assim, o recurso chamar delete fará com que este objeto o remova dos
+    # recursos filhos, e chamar add_sibling fará com que este adicione um
+    # recurso filho.
     def add_child(self, resource, urn=None):
         if not urn:
             urn = hashlib.md5(os.urandom(4096)).hexdigest()
@@ -153,7 +153,7 @@ class Resource:
             self.children[urn] = resource
         with resource.lock:
             resource.on_add_sibling = self.add_child
-            resource.on_delete = functools.partial(self.delete_child, urn)
+            resource.on_delete = lambda: self.delete_child(urn)
 
     # Deleta um recurso filho. Recursos filhos deste objeto adicionados com
     # add_child chamarão este método ao chamar delete.
