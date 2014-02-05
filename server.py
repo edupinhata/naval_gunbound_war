@@ -278,12 +278,13 @@ class Player(Monitor):
     # Computa dano ao jogador. Se chegar a 0, morre, cedendo um kill para o
     # jogador que originou o dano.
     def add_damage(self, source):
+        if self is source:
+            return
         with self.lock:
             self.dirty = True
             self.attributes['hp'] -= 1
             if self.attributes['hp'] < 1:
-                if source.get_data()['type'] == self.attributes['type']:
-                    source.add_kill()
+                source.add_kill()
                 self.delete()
 
     # Adiciona 1 aos kills do jogador.
