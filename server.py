@@ -230,53 +230,24 @@ class Monitor(Resource):
                              email.utils.formatdate(self.timestamp))]}
 
 
-# Um jogador monitora um conjunto de atributos.
-class Player(Monitor):
+# Um objeto monitora um conjunto de atributos.
+class Object(Monitor):
 
     # Construtor.
-    def __init__(self, script):
+    def __init__(self):
         Monitor.__init__(self)
-        self.script = script
-        self.attributes = {'type': 'player',
-                           'hp': 10, 'shots': 0, 'kills': 0,
+        self.attributes = {'hp': 10, 'type': None,
                            'posx': 0, 'posy': 0,
                            'movx': 0, 'movy': 0,
-                           'lookx': 1, 'looky': 1,
-                           'shooting': False}
+                           'lookx': 1, 'looky': 1}
 
     # Implementado de Monitor. Uma requisição GET retorna uma cópia dos
-    # atributos do jogador em formato dicionário.
+    # atributos do objeto em formato dicionário.
     def get_data(self):
         with self.lock:
             return self.attributes.copy()
 
-    # Método que trata colisão com outro jogador. Um jogador que colide apenas
-    # pára de se mover.
-    def collide(self, player):
-        with self.lock:
-            for i in ['movx', 'movy']:
-                self.dirty = True
-                self.attributes[i] = 0
-
-    # Atira, criando um recurso irmão da classe Projectile. Máximo 5 tiros por
-    # vez.
-    def add_shot(self):
-        with self.lock:
-            if self.attributes['shots'] >= 5:
-                return
-            self.attributes['shots'] += 1
-            self.dirty = True
-        urn = hashlib.md5(os.urandom(4096)).hexdigest()
-        self.add_sibling(Projectile(self), urn)
-
-    # Indica que um tiro foi removido.
-    def remove_shot(self):
-        with self.lock:
-            self.attributes['shots'] -= 1
-            self.dirty = True
-
-    # Computa dano ao jogador. Se chegar a 0, morre, cedendo um kill para o
-    # jogador que originou o dano.
+    # Computa dano ao objeto. Se chegar a 0, é deletado.
     def add_damage(self, source):
         if self is source:
             return
@@ -284,19 +255,20 @@ class Player(Monitor):
             self.dirty = True
             self.attributes['hp'] -= 1
             if self.attributes['hp'] < 1:
-                source.add_kill()
                 self.delete()
 
-    # Adiciona 1 aos kills do jogador.
-    def add_kill(self):
+    # Método que trata colisão com outro objeto. Em princípio, o objeto pára de
+    # se mover.
+    def collide(self, player):
         with self.lock:
-            self.dirty = True
-            self.attributes['kills'] += 1
+            for i in ['movx', 'movy']:
+                self.dirty = True
+                self.attributes[i] = 0
 
-    # Método que move o jogador. Recebe um dict(x: dict(y: player))
-    # substituindo uma matriz para verificar se já existem jogadores no
-    # destino. Se houver, chama o método de tratamento de colisão. Se não
-    # houver, atualiza o dicionário.
+    # Método que move o objeto. Recebe um dicionário que mapeia cada X para um
+    # dicionário que mapeia para cada Y um objeto para verificar se já existem
+    # objetos no destino. Se houver, chama o método de tratamento de colisão.
+    # Se não houver, atualiza o dicionário.
     def move(self, occupied):
         with self.lock:
             x, y = self.attributes['posx'], self.attributes['posy']
@@ -322,15 +294,71 @@ class Player(Monitor):
             self.attributes['posx'] = x
             self.attributes['posy'] = y
 
-    # Executa o script do jogador. Expõe uma cópia de alguns atributos do
-    # jogador e dos outros jogadores. Ao final, atualiza os dados, e atira se
-    # for necessário.
-    def execute(self, other_players):
+    # Método abstrato que executa o script do objeto a partir dos outros objetos.
+    def execute(self, others):
+        pass
+
+
+# Um objeto que não se move mas é destruível.
+class Rock(Object):
+
+    # Construtor. Recebe a posição inicial.
+    def __init__(self, x, y):
+        Object.__init__(self)
+        self.attributes.update({'hp': 5, 'type': 'rock',
+                                'posx': x, 'posy': y})
+
+
+# Um jogador é um objeto com atributos adicionais.
+class Player(Object):
+
+    # Construtor. Recebe o script.
+    def __init__(self, script):
+        Object.__init__(self)
+        self.script = script
+        self.attributes.update({'hp': 10, 'type': 'player',
+                                'shots': 0, 'shooting': False, 'kills': 0})
+
+    # Atira, criando um recurso irmão da classe Projectile. Máximo 5 tiros por
+    # vez.
+    def add_shot(self):
+        with self.lock:
+            if self.attributes['shots'] >= 5:
+                return
+            self.attributes['shots'] += 1
+            self.dirty = True
+        urn = hashlib.md5(os.urandom(4096)).hexdigest()
+        self.add_sibling(Projectile(self), urn)
+
+    # Indica que um tiro foi removido.
+    def remove_shot(self):
+        with self.lock:
+            self.attributes['shots'] -= 1
+            self.dirty = True
+
+    # Adiciona 1 aos kills do jogador.
+    def add_kill(self):
+        with self.lock:
+            self.dirty = True
+            self.attributes['kills'] += 1
+
+    # Sobrescrito de Object. Se o jogador morrer, cede um kill para o jogador
+    # que o matou.
+    def add_damage(self, source):
+        Object.add_damage(self, source)
+        with self.lock:
+            if self.attributes['hp'] < 1:
+                source.add_kill()
+
+    # Sobrescrito de Object. Expõe uma cópia de alguns atributos do jogador e
+    # dos outros jogadores. Ao final, atualiza os dados, e atira se for
+    # necessário.
+    def execute(self, others):
         attributes = self.get_data()
-        players = [p.get_data() for p in other_players]
+        players = [p.get_data() for p in others]
         exec(self.script, {'attributes': attributes, 'players': players})
 
-        # Verifica diferenças nos atributos e na cópia passada.
+        # Verifica diferenças nos atributos e na cópia passada. TODO validar.
         with self.lock:
             for i in ['movx', 'movy', 'lookx', 'looky', 'shooting']:
                 if self.attributes[i] != attributes[i]:
@@ -342,14 +370,14 @@ class Player(Monitor):
             self.add_shot()
 
 
-# Um projétil é um "jogador" que move em uma direção até colidir com outro
+# Um projétil é um objeto que move em uma direção até colidir com outro
 # jogador, ou até passar do seu alcance.
-class Projectile(Player):
+class Projectile(Object):
 
     # Construtor. Recebe o jogador de origem para determinar a direção de
     # movimento, e é posicionado um passo à frente para não coincidir com ele.
     def __init__(self, player):
-        Player.__init__(self, None)
+        Object.__init__(self)
         self.player = player
         self.range = 20
 
@@ -357,50 +385,30 @@ class Projectile(Player):
         x, y = a['posx'], a['posy']
         lx, ly = a['lookx'], a['looky']
 
-        self.attributes.update({'type': 'projectile',
-            'posx': x + 2 * lx, 'posy': y + 2 * ly,
-            'movx': lx, 'movy': ly})
+        self.attributes.update({'hp': 1, 'type': 'projectile',
+                                'posx': x + 2 * lx, 'posy': y + 2 * ly,
+                                'movx': lx, 'movy': ly})
 
     # Sobrescrito de Resource. Reduz a contagem de tiros no jogador de origem.
     def delete(self):
         Resource.delete(self)
         self.player.remove_shot()
 
-    # Sobrescrito de Player. Um projétil que colide com outro jogador reduz o
-    # HP daquele, e se deleta.
-    def collide(self, player):
-        a = player.get_data()
-        player.add_damage(self.player)
+    # Sobrescrito de Object. Um projétil que colide com outro objeto reduz o HP
+    # daquele, e se deleta.
+    def collide(self, other):
+        a = other.get_data()
+        other.add_damage(self.player)
         self.delete()
 
-    # Sobrescrito de Player. Cada movimento reduz o alcance do projétil, e se
+    # Sobrescrito de Object. Cada movimento reduz o alcance do projétil, e se
     # chegar a zero, é deletado.
     def move(self, occupied):
-        Player.move(self, occupied)
+        Object.move(self, occupied)
         with self.lock:
             self.range -= 1
             if self.range < 1:
                 self.delete()
-
-    # Sobrescrito de Player. Um projétil não tem script.
-    def execute(self, other_players):
-        pass
-
-
-# Um objeto que não se move mas é destruível.
-class Rock(Player):
-
-    # Construtor.
-    def __init__(self, x, y):
-        Player.__init__(self, None)
-        self.attributes['type'] = 'rock'
-        self.attributes['posx'] = x
-        self.attributes['posy'] = y
-        self.attributes['hp'] = 5
-
-    # Sobrescrito de Player. Uma pedra não tem script.
-    def execute(self, other_players):
-        pass
 
 
 # Monitor cujos dados são os recursos filhos. Adição ou remoção marcará este
