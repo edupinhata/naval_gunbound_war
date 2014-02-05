@@ -2,15 +2,14 @@
 
 Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribuído.
 
-# Dependências
-
-* Python 3
-
 # Instruções
 
-## Clonar
+## Dependências
 
-`sudo apt-get install git`
+* Git: `sudo apt-get install git`
+* Python 3: `sudo apt-get install python3`
+
+## Clonar
 
 `git clone https://github.com/edupinhata/naval_gunbound_war`
 
@@ -25,13 +24,11 @@ Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribu�
 ### Servidor
 
 * Executar: `./server.py`
-
 * Ver opções: `./server.py -h`
 
 ### Cliente
 
 * Executar: `./client.py`
-
 * Ver opções: `./client.py -h`
 
 # API HTTP
@@ -81,7 +78,7 @@ Exemplo:
 
 ## GET /game/[nome]
 
-Obtém os atributos correspondentes a um jogador.
+Obtém os atributos correspondentes a um objeto.
 
 * Entrada: Nenhum
 * Código de retorno: `200 OK`
