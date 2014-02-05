@@ -17,5 +17,8 @@ elif attributes['posy'] >= 20:
 else:
     attributes['movy'] = random.randrange(-1, 2)
 
-if random.randrange(0, 2) == 1:
-    shoot()
+if random.randrange(0, 10) == 1:
+    attributes['shooting'] = True
+else:
+    attributes['shooting'] = False
+

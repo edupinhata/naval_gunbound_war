@@ -14,13 +14,6 @@ import time
 import os
 
 
-# Faz uma requisição a partir de uma nova conexão HTTP e devolve a resposta.
-def new_request(host, method, resource, data={}, headers={}):
-    connection = http.client.HTTPConnection(host)
-    connection.request(method, resource,
-            bytes(json.dumps(data), 'utf-8'), headers)
-    return connection.getresponse()
-
 def init_curses():
     s = curses.initscr()
     curses.curs_set(0)
@@ -35,18 +28,31 @@ def terminate_curses():
     curses.endwin()
 
 
-# Classe abstrata que requisita repetidamente um recurso e espera até que o
-# servidor tenha atualizações, e então passa os dados recebidos para o método
-# abstrato update().
+# Classe abstrata que requisita repetidamente um recurso e atualiza seus dados.
 class Poller(threading.Thread):
 
     # Construtor. Inicializa o timestamp como o menor possível, pois ainda não
     # há dados recebidos.
-    def __init__(self, host, resource):
+    def __init__(self, host, uri):
         threading.Thread.__init__(self)
         self.host = host
-        self.resource = resource
+        self.uri = uri
         self.timestamp = time.mktime(time.gmtime(0))
+
+    # Atualiza o timestamp a partir de uma resposta HTTP. Se não contém tal
+    # informação, usa o tempo atual.
+    def stamp(self, response):
+        last_modified = response.getheader('Last-Modified',
+                email.utils.formatdate(time.time()))
+        self.timestamp = time.mktime(email.utils.parsedate(last_modified))
+
+    # Lê o conteúdo de uma resposta HTTP formatado em JSON, e retorna um
+    # dicionário correspondente.
+    def read(self, response):
+        try:
+            return json.loads(response.read().decode('utf-8'))
+        except:
+            return {}
 
     # Requisita (atualizações de) o recurso repetidamente. Ao receber os dados,
     # atualiza o timestamp, e passa para o método update. Se encontrar erro na
@@ -54,29 +60,38 @@ class Poller(threading.Thread):
     def run(self):
         connection = http.client.HTTPConnection(self.host)
         while True:
-            connection.request('GET', self.resource,
+            connection.request('GET', self.uri,
                                headers={'If-Modified-Since':
                                    email.utils.formatdate(self.timestamp)})
             response = connection.getresponse()
             if response.status == http.client.NOT_FOUND:
                 break
 
-            last_modified = response.getheader('Last-Modified',
-                    email.utils.formatdate(time.time()))
-            self.timestamp = time.mktime(email.utils.parsedate(last_modified))
+            self.stamp(response)
+            data = self.read(response)
+            response.close()
 
-            data = {}
-            try:
-                data = json.loads(response.read().decode('utf-8'))
-            except:
-                pass
-            finally:
-                response.close()
-                self.update(data)
+            self.update(data)
 
     # Método abstrato para lidar com os dados recebidos.
     def update(self, data):
         pass
+
+
+# Um jogador. A variável on_update é uma função que pode ser setada pelo jogo
+# para sinalizar atualização do jogador.
+class Player(Poller):
+
+    # Construtor. Inicia sua thread que escuta atualizações.
+    def __init__(self, host, uri):
+        Poller.__init__(self, host, uri)
+        self.attributes = {'posx': 0, 'posy': 0,
+                'movx': 0, 'movy': 0, 'lookx': 0, 'looky': 0}
+
+    # Método implementado da superclasse. Os dados recebidos são os atributos
+    # do jogador.
+    def update(self, data):
+        self.attributes = data
 
 
 # Mantém jogadores, mapeados por tokens, e o próprio jogador. Recebe
@@ -88,109 +103,56 @@ class Game(Poller):
     # Construtor. Recebe um filename para o script a ser executado na
     # atualização dos jogadores, Recebe também os dados para criação do próprio
     # jogador, e o cria.
-    def __init__(self, host, resource, script, data):
-        Poller.__init__(self, host, resource)
+    def __init__(self, host, uri, name, script):
+        Poller.__init__(self, host, uri)
+        self.name = name
+
+        f = open(script)
+        self.script = f.read()
+        f.close()
 
         self.players = {}
         self.on_game_update = None
+
         threading.Thread(target=self.game_update).start()
 
-        self.you = You(host, resource, script, data)
+    # Cria um objeto Player e o faz escutar por modificações.
+    def create_player(self, name):
+        p = Player(self.host, self.uri + '/' + name)
+        p.start()
+        return p
+
+    # Cria o próprio jogador.
+    def create_self(self):
+        data = {'name': self.name, 'script': self.script}
+
+        connection = http.client.HTTPConnection(self.host)
+        connection.request('POST', self.uri, bytes(json.dumps(data), 'utf-8'))
+
+        response = connection.getresponse()
+        urn = response.getheader('Location') # TODO validar
+        response.close()
+
+        self.player = self.create_player(urn)
 
     # Implementado da superclasse. Dados recebidos são uma lista de tokens
     # representando cada jogador. Tokens que não estão no nosso dicionário são
     # adicionados como jogadores novos, e tokens no nosso dicionário que não
     # estão nos dados recebidos são jogadores removidos.
     def update(self, data):
-        players = {t: p for t, p in self.players.items()
-                   if t in data and t != self.you.token}
-        players.update({t: self.create_player(t) for t in data
-                        if t not in self.players and t != self.you.token})
+        players = {n: p for n, p in self.players.items()
+                   if n in data and n != self.name}
+        players.update({n: self.create_player(n) for n in data
+                        if n not in self.players and n != self.name})
         self.players = players
 
-    # Cria um objeto Player 
-    def create_player(self, token):
-        p = Player(self.host, self.resource + '/' + token)
-        p.on_update = self.game_update
-        p.start()
-        return p
-
-    # Executa o script.
+    # Chama a função on_game_update a cada intervalo de tempo, setada por
+    # alguma interface.
     def game_update(self):
         while True:
             time.sleep(0.1)
-            self.you.execute(self.players)
             if self.on_game_update:
                 self.on_game_update()
-
-
-# Um jogador. A variável on_update é uma função que pode ser setada pelo jogo
-# para sinalizar atualização do jogador.
-class Player(Poller):
-
-    # Construtor. Inicia sua thread que escuta atualizações.
-    def __init__(self, host, resource):
-        Poller.__init__(self, host, resource)
-        self.attributes = {'posx': 0, 'posy': 0, 'movx': 0,
-                'movy': 0, 'lookx': 0, 'looky': 0}
-
-    # Método implementado da superclasse. Os dados recebidos são os atributos
-    # do jogador.
-    def update(self, data):
-        self.attributes = data
-
-
-# O próprio jogador. Possui métodos para reagir a atualizações dos outros
-# jogadores e enviar modificações do estado para o servidor.
-class You(Player):
-
-    # Construtor. Inicializa o script e cria o recurso no servidor.
-    def __init__(self, host, parent_resource, script, data):
-        Player.__init__(self, host, parent_resource)
-        self.init_script(script)
-        self.init_player(data)
-        self.start()
-
-    # Lê o script, deixando-o pronto pra ser executado.
-    def init_script(self, filename):
-        f = open(filename)
-        self.script = f.read()
-        f.close()
-        self.script_lock = threading.Lock()
-
-    # Cria o nosso jogador. Como o construtor recebeu '/game', adiciona o token
-    # ao caminho.
-    def init_player(self, data):
-        self.password = data['password']
-        response = new_request(self.host, 'POST', self.resource, data)
-        self.token = response.getheader('Location') # TODO validar
-        response.close()
-        self.resource += '/' + self.token
-
-    # Atira.
-    def shoot(self):
-        data = {'password': self.password}
-        response = new_request(self.host, 'POST', self.resource, data)
-
-    # Executa o script, expondo uma cópia dos atributos dos jogador e os outros
-    # jogadores.  Ao final, se foram feitas modificações nos atributos, pede ao
-    # servidor para atualizá-las.
-    def execute(self, other_players):
-        with self.script_lock:
-            attributes = self.attributes.copy()
-            exec(self.script, {'attributes': attributes, 'shoot': self.shoot,
-                'players': other_players})
-
-            for i, j in attributes.items():
-                if self.attributes[i] != j:
-                    threading.Thread(target=self.refresh,
-                            kwargs={'data': attributes}).start()
-                    break
-
-    # Informa o servidor sobre o novo estado do jogador.
-    def refresh(self, data):
-        data.update({"password": self.password})
-        new_request(self.host, 'PUT', self.resource, data).close()
 
 
 # Interface textual.
@@ -203,49 +165,16 @@ class Curses:
         self.game = game
         self.game.on_game_update = self.draw
 
-        self.messages = ['' for i in range(3)]
-        self.draw_lock = threading.Semaphore()
-
         self.screen = screen
-        self.window = curses.newwin(self.get_window_height(), self.get_window_width())
+        self.window = curses.newwin(curses.LINES, curses.COLS)
+        self.status = curses.newwin(3, 12, 1, 1)
 
-        self.status_width = 12
-        self.status_height = 3
-        self.status = curses.newwin(self.status_height, self.status_width,
-                1, 1)
-
-        self.log_width = curses.COLS
-        self.log_height = 5
-        self.log = curses.newwin(self.log_height, self.log_width,
-                self.get_window_height(), 0)
-
-    def get_window_width(self):
-        return curses.COLS
-
-    def get_window_height(self):
-        return curses.LINES - 5
-
-    def get_x(self):
-        return int(self.get_window_width() / 2)
-
-    def get_y(self):
-        return int(self.get_window_height() / 2)
-
-    # Desenha a tela. 
+    # Desenha a tela.
     def draw(self):
-        self.add_message(str(self.game.you.attributes))
-
-        self.draw_lock.acquire()
-
         self.draw_window()
         self.draw_status()
-        self.draw_log()
-
         self.window.refresh()
         self.status.refresh()
-        self.log.refresh()
-
-        self.draw_lock.release()
 
     # Desenha a janela principal do jogo.
     def draw_window(self):
@@ -255,71 +184,60 @@ class Curses:
 
     # Desenha os personagens na tela.
     def draw_players(self):
+        x = int(curses.COLS / 2)
+        y = int(curses.LINES / 2)
         for p in self.game.players.values():
-            x = self.get_x() + p.attributes['posx'] - self.game.you.attributes['posx']
-            y = self.get_y() + p.attributes['posy'] - self.game.you.attributes['posy']
-            if (x not in range(0, self.get_window_width()) or
-                y not in range(0, self.get_window_height())):
-                continue
             if 'type' not in p.attributes:
                 continue
-            mark = '.' if p.attributes['type'] == 'projectile' else '#'
-            self.window.addstr(y, x, mark)
-        self.window.addstr(self.get_y(), self.get_x(), '@')
-
-    def draw_player(self, player, selfx, selfy):
-        #with player.lock:
-        pass
+            px = x + p.attributes['posx'] - self.game.player.attributes['posx']
+            py = y + p.attributes['posy'] - self.game.player.attributes['posy']
+            if (px not in range(0, curses.COLS) or
+                py not in range(0, curses.LINES)):
+                continue
+            self.window.addstr(py, px,
+                    '.' if p.attributes['type'] == 'projectile' else '#')
+        self.window.addstr(y, x, '@')
 
     # Desenha o status do jogador.
     def draw_status(self):
         self.status.erase()
-        try: self.status.addstr(1, 1, '░░░░░░░░░░')
-        except curses.error: pass
-        try: self.status.addnstr(1, 1, '██████████', self.game.you.attributes['hp'])
-        except curses.error: pass
-        try: self.status.addnstr(0, 1, self.game.you.attributes['name'], 10)
-        except curses.error: pass
-
-    # Desenha o log de mensagens. #TODO deprecado por uso de scripts.
-    def draw_log(self):
-        self.log.erase()
-        self.log.border()
-        for i in range(3):
-            self.log.addstr(3 - i, 1, self.messages[i])
-
-    # Adiciona uma mensagem.
-    def add_message(self, message):
-        self.messages.pop()
-        self.messages.insert(0, message)
-        self.draw_log()
+        try:
+            self.status.addstr(1, 1, '░░░░░░░░░░')
+        #except curses.error: pass
+        #try:
+            self.status.addnstr(1, 1, '██████████', self.game.player.attributes['hp'])
+        #except curses.error: pass
+        #try:
+            self.status.addnstr(0, 1, self.game.name, 10)
+        except: pass
 
 
 # Main.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Cliente do jogo',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-n', '--name',
-            default='HP',
+    parser.add_argument('-n', '--name', default='HP',
             help='O nome do jogador.')
-    parser.add_argument('-w', '--password',
-            default=hashlib.md5(os.urandom(4096)).hexdigest(),
-            help='A senha do jogador.')
-    parser.add_argument('-s', '--script',
-            default='script.py',
+    parser.add_argument('-s', '--script', default='script.py',
             help='O script do jogador.')
-    parser.add_argument('-p', '--path',
-            default='localhost:8000',
+    parser.add_argument('-p', '--path', default='localhost:8000',
             help='O endereço do servidor.')
+    parser.add_argument('-u', '--uri', default='/game',
+            help='O localizador de recurso do jogo.')
     args = parser.parse_args()
 
-    g = Game(args.path, '/game', args.script,
-             {"name": args.name, "password": args.password})
-    c = Curses(init_curses(), g)
+    g = Game(args.path, args.uri, args.name, args.script)
+    g.create_self()
+
+    screen = init_curses()
+    c = Curses(screen, g)
 
     g.start()
+
     try:
         g.join()
     except:
+        pass
+    finally:
         terminate_curses()
 
