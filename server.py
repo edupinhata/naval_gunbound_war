@@ -312,9 +312,11 @@ class Rock(Object):
 # Um jogador é um objeto com atributos adicionais.
 class Player(Object):
 
-    # Construtor. Recebe o script.
-    def __init__(self, script):
+    # Construtor. Recebe o script, e uma senha para que o cliente possa fazer
+    # modificações.
+    def __init__(self, password, script):
         Object.__init__(self)
+        self.password = password
         self.script = script
         self.attributes.update({'hp': 10, 'type': 'player',
                                 'shots': 0, 'shooting': False, 'kills': 0})
@@ -368,6 +370,17 @@ class Player(Object):
         # Verifica se o jogador está atirando.
         if attributes['shooting']:
             self.add_shot()
+
+    # Sobrescrito de Resource. Altera o script.
+    def do_PUT(self, data):
+        for i in['password', 'script']:
+            if i not in data:
+                return {'code': http.client.EXPECTATION_FAILED}
+        if data['password'] != self.password:
+            return {'code': http.client.FORBIDDEN}
+
+        with self.lock:
+            self.script = data['script']
 
 
 # Um projétil é um objeto que move em uma direção até colidir com outro
@@ -450,10 +463,12 @@ class Game(Container, threading.Thread):
     # de entrada. Retorna uma resposta com o campo Location do cabeçalho
     # contendo a URN do jogador criado.
     def do_POST(self, data):
-        if 'name' not in data or 'script' not in data:
-            return {'code': http.client.EXPECTATION_FAILED}
+        for i in['name', 'password', 'script']:
+            if i not in data:
+                return {'code': http.client.EXPECTATION_FAILED}
 
         name = data['name']
+        password = data['password']
         script = data['script']
 
         # O nome deve ser único.
@@ -461,7 +476,7 @@ class Game(Container, threading.Thread):
             if name in self.children:
                 return {'code': http.client.EXPECTATION_FAILED} # TODO outro código
 
-        self.add_child(Player(script), name)
+        self.add_child(Player(password, script), name)
         return {'code': http.client.CREATED,
                 'headers': [('Location', name)]}
 
