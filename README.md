@@ -136,3 +136,20 @@ Exemplo:
 }
 ```
 
+## DELETE /game/[nome]
+
+Recebe a senha para modificações e remove o jogador.
+
+* Entrada: Objeto JSON
+ * `password`: `string`
+* Código de retorno: `204 No Content`
+* Saída: Nenhum
+
+Exemplo:
+
+```json
+{
+    "password": "123456",
+}
+```
+

@@ -114,6 +114,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_PUT(self):
         self.reply(self.server.find_resource(self.path).do_PUT(self.read()))
 
+    # Trata uma requisição DELETE.
+    def do_DELETE(self):
+        self.reply(self.server.find_resource(self.path).do_DELETE(self.read()))
+
     # Descomentar para suprimir logging de requisições respondidas.
     #def log_message(self, format, *args):
         #return
@@ -183,6 +187,10 @@ class Resource:
         return self.default_reply
 
     # Trata uma requisição PUT.
+    def do_PUT(self, data):
+        return self.default_reply
+
+    # Trata uma requisição DELETE.
     def do_PUT(self, data):
         return self.default_reply
 
@@ -383,6 +391,17 @@ class Player(Object):
             self.script = data['script']
 
         return {'code': http.client.ACCEPTED}
+
+    # Sobrescrito de Resource. Deleta o jogador.
+    def do_DELETE(self, data):
+        if 'password' not in data:
+            return {'code': http.client.EXPECTATION_FAILED}
+        if data['password'] != self.password:
+            return {'code': http.client.FORBIDDEN}
+
+        self.delete()
+
+        return {'code': http.client.NO_CONTENT}
 
 
 # Um projétil é um objeto que move em uma direção até colidir com outro

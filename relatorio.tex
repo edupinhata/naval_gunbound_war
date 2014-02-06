@@ -122,7 +122,7 @@ exemplo, \texttt{/game/abc123}, onde \texttt{abc123} é o nome do recurso (URN)
 e \texttt{http://localhost:8000/game/abc123} é a localização do recurso (URL).
 Clientes devem realizar requisições, por exemplo, \texttt{GET} para obter as
 informações sobre o recurso, \texttt{POST} para criar um novo, \texttt{PUT}
-para alterá-lo.
+para alterá-lo e \texttt{DELETE} para removê-lo.
 
 Cada objeto do jogo tem uma URN única e está contido no recurso \texttt{/game},
 sendo da forma \texttt{/game/[urn]}. Cada cliente deve-se manter atualizado
@@ -257,6 +257,27 @@ Exemplo:
     "password": "123456",
     "script": "import random
                attributes['movy'] = random.randrange(-1, 2)"
+}
+\end{verbatim}
+
+\subsubsection{\texttt{DELETE /game/[nome]}}
+
+Recebe a senha para modificações e remove o jogador.
+
+\begin{itemize}
+	\item Entrada: Objeto JSON
+		\begin{itemize}
+			\item \texttt{password}: \texttt{string}
+		\end{itemize}
+	\item Código de retorno: \texttt{204 No Content}
+	\item Saída: Nenhum
+\end{itemize}
+
+Exemplo:
+
+\begin{verbatim}
+{
+    "password": "123456",
 }
 \end{verbatim}
 
