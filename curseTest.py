@@ -4,10 +4,20 @@ import curses
 import time
 import threading
 
+mybuffer=""
+buffer_lock = threading.Lock()
+produtor = 0
+consumidor =0
+
 class Editor(threading.Thread):
 
     def __init__(self, mybuffer, buffer_lock, produtor, consumidor, screen):
         threading.Thread.__init__(self)
+        self.mybuffer = mybuffer
+        self.buffer_lock = buffer_lock
+        self.produtor = produtor
+        self.consumidor = consumidor
+
         self.screen = screen
         curses.curs_set(1)
         self.start()
@@ -21,18 +31,13 @@ class Editor(threading.Thread):
             if c == curses.KEY_DC:
                break
             else:
-                with buffer_lock: 
-                    my_buffer += chr(c)
-                    produtor += 1
+                with self.buffer_lock: 
+                    self.mybuffer += chr(c)
+                    self.produtor += 1
                     #self.screen.addstr(5,5, "teste")
-                    self.screen.addstr(0,0, my_buffer)
+                    self.screen.addstr(0,0, self.mybuffer)
             self.screen.refresh()
     
-
-mybuffer=""
-buffer_lock = threading.Lock()
-produtor = 0
-consumidor =0
 
 curses.wrapper(lambda s: Editor(mybuffer, buffer_lock, produtor, consumidor, s))
 
