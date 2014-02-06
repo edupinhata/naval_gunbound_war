@@ -382,6 +382,8 @@ class Player(Object):
         with self.lock:
             self.script = data['script']
 
+        return {'code': http.client.ACCEPTED}
+
 
 # Um projétil é um objeto que move em uma direção até colidir com outro
 # jogador, ou até passar do seu alcance.
