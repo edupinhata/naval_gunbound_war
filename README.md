@@ -1,6 +1,7 @@
-# naval_gunbound_war
+# ScriptBattle
 
-Projeto de Sistemas Distribuídos. Implementação de um batalha naval distribuído.
+Projeto de Sistemas Distribuídos. Implementação de um jogo *multiplayer* de
+batalha por scripts.
 
 # Instruções
 
