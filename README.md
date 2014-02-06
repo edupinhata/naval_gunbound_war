@@ -57,12 +57,13 @@ Exemplo:
 
 ## POST /game
 
-Recebe um nome único e o script do jogador, e cria um recurso de URI
-`/game/[nome]` no servidor. A URN é retornada no campo `Location`
-do cabeçalho HTTP de retorno.
+Recebe um nome único, uma senha para modificações, e o script do jogador, e
+cria um recurso de URI `/game/[nome]` no servidor. A URN é retornada no campo
+`Location` do cabeçalho HTTP de retorno.
 
 * Entrada: Objeto JSON
  * `name`: `string`
+ * `password`: `string`
  * `script`: `string`
 * Código de retorno: `201 Created`
 * Saída: Nenhum
@@ -72,6 +73,7 @@ Exemplo:
 ```json
 {
     "name": "player1",
+    "password": "123456",
     "script": "import random
                attributes['movx'] = random.randrange(-1, 2)"
 }
@@ -113,3 +115,24 @@ Exemplo:
     "kills": 0
 }
 ```
+
+## PUT /game/[nome]
+
+Recebe a senha para modificações e um script para substituir o antigo.
+
+* Entrada: Objeto JSON
+ * `password`: `string`
+ * `script`: `string`
+* Código de retorno: `202 Accepted`
+* Saída: Nenhum
+
+Exemplo:
+
+```json
+{
+    "password": "123456",
+    "script": "import random
+               attributes['movy'] = random.randrange(-1, 2)"
+}
+```
+

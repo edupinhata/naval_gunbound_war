@@ -121,7 +121,8 @@ corresponde a um \textit{recurso} no servidor identificado por uma URI, por
 exemplo, \texttt{/game/abc123}, onde \texttt{abc123} é o nome do recurso (URN)
 e \texttt{http://localhost:8000/game/abc123} é a localização do recurso (URL).
 Clientes devem realizar requisições, por exemplo, \texttt{GET} para obter as
-informações sobre o recurso, \texttt{POST} para criar um novo, etc.
+informações sobre o recurso, \texttt{POST} para criar um novo, \texttt{PUT}
+para alterá-lo.
 
 Cada objeto do jogo tem uma URN única e está contido no recurso \texttt{/game},
 sendo da forma \texttt{/game/[urn]}. Cada cliente deve-se manter atualizado
@@ -168,14 +169,15 @@ Exemplo:
 
 \subsubsection{\texttt{POST /game}}
 
-Recebe um nome único e o script do jogador, e cria um recurso de URI
-\texttt{/game/[nome]} no servidor. A URN é retornada no campo \texttt{Location}
-do cabeçalho HTTP de retorno.
+Recebe um nome único, uma senha para modificações, e o script do jogador, e
+cria um recurso de URI \texttt{/game/[nome]} no servidor. A URN é retornada no
+campo \texttt{Location} do cabeçalho HTTP de retorno.
 
 \begin{itemize}
 	\item Entrada: Objeto JSON
 		\begin{itemize}
 			\item \texttt{name}: \texttt{string}
+			\item \texttt{password}: \texttt{password}
 			\item \texttt{script}: \texttt{string}
 		\end{itemize}
 	\item Código de retorno: \texttt{201 Created}
@@ -187,6 +189,7 @@ Exemplo:
 \begin{verbatim}
 {
     "name": "player1",
+    "password": "123456",
     "script": "import random
                attributes['movx'] = random.randrange(-1, 2)"
 }
@@ -230,6 +233,30 @@ Exemplo:
     "shots": 0,
     "shooting": false,
     "kills": 0
+}
+\end{verbatim}
+
+\subsubsection{\texttt{PUT /game/[nome]}}
+
+Recebe a senha para modificações e um script para substituir o antigo.
+
+\begin{itemize}
+	\item Entrada: Objeto JSON
+		\begin{itemize}
+			\item \texttt{password}: \texttt{string}
+			\item \texttt{script}: \texttt{string}
+		\end{itemize}
+	\item Código de retorno: \texttt{202 Accepted}
+	\item Saída: Nenhum
+\end{itemize}
+
+Exemplo:
+
+\begin{verbatim}
+{
+    "password": "123456",
+    "script": "import random
+               attributes['movy'] = random.randrange(-1, 2)"
 }
 \end{verbatim}
 
