@@ -21,7 +21,7 @@ class EditorColorize(threading.Thread):
         self.consumidor = consumidor
         self.screen = screen
 
-
+#classe que roda um captador de letras de modo que atualiza o buffer
 class Editor(threading.Thread):
 
     def __init__(self, Curses,  mybuffer, buffer_lock, produtor, consumidor, screen):
@@ -44,6 +44,9 @@ class Editor(threading.Thread):
             script.close()
         except: pass
         
+    #função que exclui o ultimo caractere do editor
+    def excludeLastChr(self, buffer):
+        buffer = buffer[0:-1]
 
     def run(self):
         while True:
@@ -51,6 +54,13 @@ class Editor(threading.Thread):
             if c == curses.KEY_DC:
                 with self.buffer_lock:
                     self.exportScript(self.mybuffer)
+            if c == curses.KEY_RIGHT:
+                with self.buffer_lock:
+                    self.Curses.Game.send_script(self.Curses.mybuffer)
+            if c == curses.KEY_BACKSPACE:
+                with self.buffer_lock:
+                    #self.excludeLastChr(self.Curses.mybuffer)
+                    self.Curses.mybuffer = self.Curses.mybuffer[0:-1]
             else:
                 with self.buffer_lock: 
                     self.Curses.mybuffer += chr(c)
