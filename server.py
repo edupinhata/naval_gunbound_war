@@ -131,7 +131,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 # Universal Resource Location, exemplo: "http://localhost:8000/game/abc123").
 # Um recurso tem métodos que respondem a requisições HTTP. Tipicamente, uma
 # requisição GET retorna os dados do recurso, POST cria um recurso filho nele,
-# e PUT atualiza os dados.
+# PUT atualiza os dados e DELETE remove o recurso.
 class Resource:
 
     # Construtor. Define o código de retorno padrão como "método não
@@ -191,7 +191,7 @@ class Resource:
         return self.default_reply
 
     # Trata uma requisição DELETE.
-    def do_PUT(self, data):
+    def do_DELETE(self, data):
         return self.default_reply
 
 
