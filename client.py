@@ -22,6 +22,7 @@ class Poller(threading.Thread):
         self.host = host
         self.uri = uri
         self.timestamp = time.mktime(time.gmtime(0))
+        self.lock = threading.Lock()
 
     # Atualiza o timestamp a partir de uma resposta HTTP. Se não contém tal
     # informação, usa o tempo atual.
@@ -37,6 +38,14 @@ class Poller(threading.Thread):
             return json.loads(response.read().decode('utf-8'))
         except:
             return {}
+
+    # Método abstrato que obtém os dados do objeto.
+    def get_data(self):
+        pass
+
+    # Método abstrato para lidar com os dados recebidos.
+    def update(self, data):
+        pass
 
     # Requisita (atualizações de) o recurso repetidamente. Ao receber os dados,
     # atualiza o timestamp, e passa para o método update. Se encontrar erro na
@@ -57,13 +66,9 @@ class Poller(threading.Thread):
 
             self.update(data)
 
-    # Método abstrato para lidar com os dados recebidos.
-    def update(self, data):
-        pass
 
-
-# Um jogador.
-class Player(Poller):
+# Um objeto do jogo.
+class Object(Poller):
 
     # Construtor.
     def __init__(self, host, uri):
@@ -71,9 +76,15 @@ class Player(Poller):
         self.attributes = {'posx': 0, 'posy': 0,
                 'movx': 0, 'movy': 0, 'lookx': 0, 'looky': 0}
 
-    # Sobrescrito de Poller. Os dados recebidos são os atributos do jogador.
+    # Sobrescrito de Poller. Os dados do objeto são seus atributos.
+    def get_data(self):
+        with self.lock:
+            return self.attributes.copy()
+
+    # Sobrescrito de Poller. Os dados recebidos são os atributos do objeto.
     def update(self, data):
-        self.attributes = data
+        with self.lock:
+            self.attributes = data
 
 
 # Mantém jogadores, mapeados por tokens, e o próprio jogador. Recebe
@@ -87,16 +98,21 @@ class Game(Poller):
     # jogador, e o cria.
     def __init__(self, host, uri, name, script):
         Poller.__init__(self, host, uri)
-        self.players = {}
+        self.objects = {}
         self.name = name
 
         f = open(script)
         self.script = f.read()
         f.close()
 
-    # Cria um objeto Player e o faz escutar por modificações.
-    def create_player(self, name):
-        p = Player(self.host, self.uri + '/' + name)
+    # Sobrescrito de Poller. Os dados são os objetos do jogo.
+    def get_data(self):
+        with self.lock:
+            return self.objects.copy()
+
+    # Cria um objeto e o faz escutar por modificações.
+    def create_object(self, name):
+        p = Object(self.host, self.uri + '/' + name)
         p.start()
         return p
 
@@ -111,18 +127,19 @@ class Game(Poller):
         urn = response.getheader('Location') # TODO validar
         response.close()
 
-        self.player = self.create_player(urn)
+        self.player = self.create_object(urn)
 
     # Sobrescrito de Poller. Dados recebidos são uma lista de URNs
-    # representando cada jogador. URNs que não estão no nosso dicionário são
-    # adicionados como jogadores novos, e tokens no nosso dicionário que não
-    # estão nos dados recebidos são jogadores removidos.
+    # representando cada objetos. URNs que não estão no nosso dicionário são
+    # adicionados como objetos novos, e tokens no nosso dicionário que não
+    # estão nos dados recebidos são objetos removidos.
     def update(self, data):
-        players = {n: p for n, p in self.players.items()
-                   if n in data and n != self.name}
-        players.update({n: self.create_player(n) for n in data
-                        if n not in self.players and n != self.name})
-        self.players = players
+        with self.lock:
+            objects = {n: p for n, p in self.objects.items()
+                       if n in data and n != self.name}
+            objects.update({n: self.create_object(n) for n in data
+                            if n not in self.objects and n != self.name})
+            self.objects = objects
 
 
 # Interface textual.
@@ -142,34 +159,40 @@ class Curses(threading.Thread):
         self.join()
 
     # Desenha os objetos na tela.
-    def draw_players(self):
+    def draw_objects(self):
 
-        x = int(curses.COLS / 2)
-        y = int(curses.LINES / 2)
+        midx = int(curses.COLS / 2)
+        midy = int(curses.LINES / 2)
 
-        for p in self.game.players.values():
-            marks = {'player': 'O', 'projectile': '.', 'rock': '#'}
-            if 'type' not in p.attributes:
+        selfattrs = self.game.player.get_data()
+        selfx = selfattrs['posx']
+        selfy = selfattrs['posy']
+
+        marks = {'player': 'O', 'projectile': '.', 'rock': '#'}
+
+        for obj in self.game.get_data().values():
+            oattrs = obj.get_data()
+            if 'type' not in oattrs:
                 continue
 
-            px = x + p.attributes['posx'] - self.game.player.attributes['posx']
-            py = y + p.attributes['posy'] - self.game.player.attributes['posy']
-            if (px not in range(0, curses.COLS) or
-                py not in range(0, curses.LINES)):
+            ox = midx + oattrs['posx'] - selfx
+            oy = midy + oattrs['posy'] - selfx
+            if (ox not in range(0, curses.COLS) or
+                oy not in range(0, curses.LINES)):
                 continue
 
-            self.screen.addstr(py, px, marks[p.attributes['type']])
+            self.screen.addstr(oy, ox, marks[oattrs['type']])
 
-        self.screen.addstr(y, x, '@')
+        self.screen.addstr(midy, midx, '@')
 
     # Desenha o status do jogador.
     def draw_status(self):
+        selfattrs = self.game.player.get_data()
         try:
             self.screen.addstr(1, 1, self.game.name + ': ' +
-                    str(self.game.player.attributes['kills']))
+                    str(selfattrs['kills']))
             self.screen.addstr(2, 1, '░░░░░░░░░░')
-            self.screen.addnstr(2, 1, '██████████',
-                    self.game.player.attributes['hp'])
+            self.screen.addnstr(2, 1, '██████████', selfattrs['hp'])
         except:
             pass
 
@@ -177,7 +200,7 @@ class Curses(threading.Thread):
     def run(self):
         while True:
             self.screen.erase()
-            self.draw_players()
+            self.draw_objects()
             self.draw_status()
             self.screen.refresh()
             time.sleep(self.step)
