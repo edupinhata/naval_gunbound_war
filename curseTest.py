@@ -9,35 +9,63 @@ buffer_lock = threading.Lock()
 produtor = 0
 consumidor =0
 
-class Editor(threading.Thread):
-
+#classe que irá ler o que está no buffer. Ao achar alguma palavra específica, ele imprime a palavra colorida
+class EditorColorize(threading.Thread):
+    
     def __init__(self, mybuffer, buffer_lock, produtor, consumidor, screen):
         threading.Thread.__init__(self)
         self.mybuffer = mybuffer
         self.buffer_lock = buffer_lock
         self.produtor = produtor
         self.consumidor = consumidor
+        self.screen = screen
 
+
+
+
+class Editor(threading.Thread):
+
+    def __init__(self, mybuffer, buffer_lock, produtor, consumidor, screen, posx, posy):
+        threading.Thread.__init__(self)
+        self.mybuffer = mybuffer
+        self.buffer_lock = buffer_lock
+        self.produtor = produtor
+        self.consumidor = consumidor
+        self.posx = posx
+        self.posy = posy
         self.screen = screen
         curses.curs_set(1)
-        self.start()
-        self.join()
+        #self.start()
+        #self.join()
+
+
+    #função que exporta o script para um arquivo.py 
+    def exportScript(self, mybuf):
+        try: 
+            script = open("scriptie.py", "w")
+            script.write(mybuf)
+            script.close()
+        except: pass
+        
 
     def run(self):
-        self.screen.addstr(0,0, "Teste\n")
-        self.screen.refresh()
         while True:
             c = self.screen.getch()
             if c == curses.KEY_DC:
-               break
+                with self.buffer_lock:
+                    self.exportScript(self.mybuffer)
+                    self.screen.clear()
+                    self.screen.addstr(0,0, "Dados gravados")
+                    self.screen.refresh()
+                    time.sleep(1)
+                    break
             else:
                 with self.buffer_lock: 
                     self.mybuffer += chr(c)
                     self.produtor += 1
-                    #self.screen.addstr(5,5, "teste")
-                    self.screen.addstr(0,0, self.mybuffer)
-            self.screen.refresh()
-    
+                    self.screen.addstr(self.posy , self.posx, self.mybuffer)
+                    self.screen.refresh()
+            
 
-curses.wrapper(lambda s: Editor(mybuffer, buffer_lock, produtor, consumidor, s))
+curses.wrapper(lambda s: Editor(mybuffer, buffer_lock, produtor, consumidor, s, 5, 0))
 

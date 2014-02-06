@@ -10,7 +10,7 @@ import json
 import copy
 import time
 import os
-
+import Editor
 
 # Classe abstrata que requisita repetidamente um recurso e atualiza seus dados.
 class Poller(threading.Thread):
@@ -157,14 +157,21 @@ class Curses(threading.Thread):
         self.game = game
         self.step = step
 
+        self.mybuffer = ""
+        self.produtor = 0
+        self.consumidor =0
+        self.editor = Editor.Editor(self, self.mybuffer, self.game.lock, self.produtor, self.consumidor, self.screen) 
+
+        self.editor.start()
         self.start()
         self.join()
+        self.editor.join()
 
     # Desenha os objetos na tela.
     def draw_objects(self):
 
         midx = int(curses.COLS / 2)
-        midy = int(curses.LINES / 2)
+        midy = int(curses.LINES / 4)
 
         selfattrs = self.game.player.get_data()
         selfx = selfattrs['posx']
@@ -198,12 +205,33 @@ class Curses(threading.Thread):
         except:
             pass
 
+    # Desenha o script que está sendo usado
+    def draw_script(self):
+        try:
+            script = open("script.py", "r")
+            buffer = script.read()
+            self.screen.addstr((int)(curses.LINES/2), 0, "-------------------------------------------------------------------------------------")
+            self.screen.addstr((int)(curses.LINES/2)+1, 0, buffer)
+            script.close()
+        except: 
+            pass
+
+    # Desenha o buffer do editor na parte baixa da tela
+    def draw_editor(self):
+        try:
+            self.screen.addstr(int(curses.LINES/2), 0, "----------------------------------------------------------------------------------------------------------------")
+            with self.game.lock:
+                self.screen.addstr(int(curses.LINES/2) + 1, 0, self.mybuffer)
+        except:
+            pass
+
     # Sobrescrito de Thread. Desenha a tela a cada intervalo de tempo.
     def run(self):
         while True:
             self.screen.erase()
             self.draw_objects()
             self.draw_status()
+            self.draw_editor()
             self.screen.refresh()
             time.sleep(self.step)
 
