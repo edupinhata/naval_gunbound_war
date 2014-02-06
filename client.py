@@ -96,10 +96,11 @@ class Game(Poller):
     # Construtor. Recebe um filename para o script a ser executado na
     # atualização dos jogadores, Recebe também os dados para criação do próprio
     # jogador, e o cria.
-    def __init__(self, host, uri, name, script):
+    def __init__(self, host, uri, name, password, script):
         Poller.__init__(self, host, uri)
         self.objects = {}
         self.name = name
+        self.password = password
 
         f = open(script)
         self.script = f.read()
@@ -118,7 +119,8 @@ class Game(Poller):
 
     # Cria o próprio jogador.
     def create_self(self):
-        data = {'name': self.name, 'script': self.script}
+        data = {'name': self.name, 'password': self.password,
+                'script': self.script}
 
         connection = http.client.HTTPConnection(self.host)
         connection.request('POST', self.uri, bytes(json.dumps(data), 'utf-8'))
@@ -212,6 +214,8 @@ if __name__ == "__main__":
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-n', '--name', default='HP',
             help='O nome do jogador.')
+    parser.add_argument('-w', '--password', default='teste',
+            help='A senha do jogador para modificações.')
     parser.add_argument('-s', '--script', default='script.py',
             help='O script do jogador.')
     parser.add_argument('-p', '--path', default='localhost:8000',
@@ -223,7 +227,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Cria o jogo.
-    g = Game(args.path, args.uri, args.name, args.script)
+    g = Game(args.path, args.uri, args.name, args.password, args.script)
     g.create_self()
     g.start()
 
