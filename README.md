@@ -9,6 +9,8 @@ batalha por scripts.
 
 * Git: `sudo apt-get install git`
 * Python 3: `sudo apt-get install python3`
+* Sqlite 3 (Banco de Dados): `sudo apt-get install sqlite3`
+* PyQt4 (Interface Gráfica): `sudo apt-get install python3-pyqt4`
 
 ## Clonar
 
