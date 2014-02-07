@@ -368,17 +368,17 @@ class Qt(PyQt4.QtGui.QWidget, threading.Thread):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Cliente do jogo',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-n', '--name', default='HP',
+    parser.add_argument('-n', '--name', default='lel',
             help='O nome do jogador.')
-    parser.add_argument('-w', '--password', default='teste',
+    parser.add_argument('-w', '--password', type=str, default='teste',
             help='A senha do jogador para modificações.')
-    parser.add_argument('-s', '--script', default='script.py',
+    parser.add_argument('-s', '--script', type=str, default='script.py',
             help='O script do jogador.')
-    parser.add_argument('-p', '--path', default='localhost:8000',
+    parser.add_argument('-p', '--path', type=str, default='localhost:8000',
             help='O endereço do servidor.')
-    parser.add_argument('-u', '--uri', default='/game',
+    parser.add_argument('-u', '--uri', type=str, default='/game',
             help='O identificador de recurso do jogo.')
-    parser.add_argument('-r', '--refresh', default=0.05,
+    parser.add_argument('-r', '--refresh', type=float, default=0.05,
             help='O tempo entre redesenhos da tela.')
     args = parser.parse_args()
 
