@@ -4,12 +4,8 @@ import curses
 import time
 import threading
 
-mybuffer=""
-buffer_lock = threading.Lock()
-produtor = 0
-consumidor =0
 
-
+#Classe incompleta
 #classe que irá ler o que está no buffer. Ao achar alguma palavra específica, ele imprime a palavra colorida
 class EditorColorize(threading.Thread):
     
@@ -21,7 +17,8 @@ class EditorColorize(threading.Thread):
         self.consumidor = consumidor
         self.screen = screen
 
-#classe que roda um captador de letras de modo que atualiza o buffer
+
+#classe que roda um captador de letras de modo que atualiza o buffer. 
 class Editor(threading.Thread):
 
     def __init__(self, Curses,  mybuffer, buffer_lock, produtor, consumidor, screen):

@@ -7,6 +7,7 @@ import email.utils
 import collections
 import threading
 import argparse
+import sqlite3
 import hashlib
 import random
 import json
@@ -322,8 +323,9 @@ class Player(Object):
 
     # Construtor. Recebe o script, e uma senha para que o cliente possa fazer
     # modificações.
-    def __init__(self, password, script):
+    def __init__(self, name, password, script):
         Object.__init__(self)
+        self.name = name
         self.password = password
         self.script = script
         self.attributes.update({'hp': 10, 'type': 'player',
@@ -351,6 +353,31 @@ class Player(Object):
         with self.lock:
             self.dirty = True
             self.attributes['kills'] += 1
+
+            # Banco de dados.
+            try:
+                c = sqlite3.connect("script_battle.db")
+                cc = c.cursor()
+            except:
+                pass
+            try:
+                cc.execute('create table score (name text not null unique, kills int not null default 0, primary key (name))')
+            except:
+                pass
+            try:
+                cc.execute('insert into score (name) values (?)', (self.name,))
+            except:
+                pass
+            try:
+                cc.execute('update score set kills=kills+1 where name=?', (self.name,))
+            except:
+                pass
+            try:
+                c.commit()
+                c.close()
+            except:
+                pass
+
 
     # Sobrescrito de Object. Se o jogador morrer, cede um kill para o jogador
     # que o matou.
@@ -497,7 +524,7 @@ class Game(Container, threading.Thread):
             if name in self.children:
                 return {'code': http.client.EXPECTATION_FAILED} # TODO outro código
 
-        self.add_child(Player(password, script), name)
+        self.add_child(Player(name, password, script), name)
         return {'code': http.client.CREATED,
                 'headers': [('Location', name)]}
 

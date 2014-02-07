@@ -378,8 +378,8 @@ if __name__ == "__main__":
             help='O endereço do servidor.')
     parser.add_argument('-u', '--uri', type=str, default='/game',
             help='O identificador de recurso do jogo.')
-    parser.add_argument('-r', '--refresh', type=float, default=0.05,
-            help='O tempo entre redesenhos da tela.')
+    parser.add_argument('-r', '--refresh', default=0.05,
+            help='O tempo entre redesenhos da tela.', type=float)
     args = parser.parse_args()
 
     # Cria o jogo.
