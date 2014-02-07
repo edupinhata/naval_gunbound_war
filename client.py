@@ -136,12 +136,12 @@ class Game(Poller):
 
     #Manda as informações atualizadas 
     def send_script(self, script):
-        data = {'name': self.name, 'password': self.password,
-                'script': script}
+        data = {'password': self.password, 'script': script}
 
         connection = http.client.HTTPConnection(self.host)
-        connection.request('PUT', self.uri, bytes(json.dumps(data), 'utf-8'))
-        
+        connection.request('PUT', self.player.uri, bytes(json.dumps(data), 'utf-8'))
+
+        connection.getresponse()
 
     # Sobrescrito de Poller. Dados recebidos são uma lista de URNs
     # representando cada objetos. URNs que não estão no nosso dicionário são
@@ -248,7 +248,6 @@ class Curses(threading.Thread):
             time.sleep(self.step)
 
 
-# Widget customizado que muda a cor.
 class QtHP(PyQt4.QtGui.QProgressBar):
 
     signal = PyQt4.QtCore.pyqtSignal(int)
@@ -289,15 +288,11 @@ class Qt(PyQt4.QtGui.QWidget, threading.Thread):
         self.width = width
         self.height = height
 
-        layout = PyQt4.QtGui.QVBoxLayout()
-
-        # Nome
-        #self.label = PyQt4.QtGui.QLabel()
-        #layout.addWidget(self.label)
+        left = PyQt4.QtGui.QVBoxLayout()
 
         # HP
         self.hp = QtHP()
-        layout.addWidget(self.hp)
+        left.addWidget(self.hp)
 
         # Matriz. TODO outro widget além de Label
         self.grid = PyQt4.QtGui.QGridLayout()
@@ -305,16 +300,29 @@ class Qt(PyQt4.QtGui.QWidget, threading.Thread):
         for i in range(width):
             for j in range(height):
                 self.grid.addWidget(QtTile(), i, j)
-        layout.addLayout(self.grid)
+        left.addLayout(self.grid)
 
-        self.setLayout(layout)
+
+        right = PyQt4.QtGui.QVBoxLayout()
+
+        self.script = PyQt4.QtGui.QTextEdit()
+        self.script.setPlainText(self.game.script)
+        right.addWidget(self.script)
+
+        self.button = PyQt4.QtGui.QPushButton('Enviar')
+        self.button.clicked.connect(lambda: self.game.send_script(self.script.toPlainText()))
+        right.addWidget(self.button)
+
+        base = PyQt4.QtGui.QHBoxLayout()
+        base.addLayout(left)
+        base.addLayout(right)
+
+        self.setLayout(base)
         self.show()
 
     def draw_status(self):
         selfattrs = self.game.player.get_data()
         self.hp.signal.emit(selfattrs['hp'])
-        #self.hp.setValue(selfattrs['hp'])
-        #self.hp.update()
 
     def draw_objects(self):
         midx = int(self.width / 2)
