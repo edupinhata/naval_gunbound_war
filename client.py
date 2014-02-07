@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import PyQt4.QtCore
+import PyQt4.QtGui
 import http.client
 import email.utils
 import threading
@@ -9,6 +11,7 @@ import curses
 import json
 import copy
 import time
+import sys
 import os
 import Editor
 
@@ -245,6 +248,114 @@ class Curses(threading.Thread):
             time.sleep(self.step)
 
 
+# Widget customizado que muda a cor.
+class QtHP(PyQt4.QtGui.QProgressBar):
+
+    signal = PyQt4.QtCore.pyqtSignal(int)
+
+    def __init__(self):
+        PyQt4.QtGui.QProgressBar.__init__(self)
+        self.signal.connect(self.setValue)
+        self.setRange(0, 10)
+        self.setValue(10)
+
+
+# Widget customizado que muda a cor.
+class QtTile(PyQt4.QtGui.QWidget):
+
+    signal = PyQt4.QtCore.pyqtSignal()
+
+    def __init__(self, color=PyQt4.QtCore.Qt.green, parent=None):
+        PyQt4.QtGui.QWidget.__init__(self, parent)
+        self.signal.connect(self.repaint)
+        self.color = color
+
+    def paintEvent(self, event):
+        PyQt4.QtGui.QWidget.paintEvent(self, event)
+        p = PyQt4.QtGui.QPainter(self)
+        p.setBrush(PyQt4.QtGui.QBrush(self.color))
+        p.drawRect(self.rect())
+
+
+# Interface gráfica.
+class Qt(PyQt4.QtGui.QWidget, threading.Thread):
+
+    def __init__(self, game, width, height, step):
+        PyQt4.QtGui.QWidget.__init__(self)
+        threading.Thread.__init__(self)
+
+        self.game = game
+        self.step = step
+        self.width = width
+        self.height = height
+
+        layout = PyQt4.QtGui.QVBoxLayout()
+
+        # Nome
+        #self.label = PyQt4.QtGui.QLabel()
+        #layout.addWidget(self.label)
+
+        # HP
+        self.hp = QtHP()
+        layout.addWidget(self.hp)
+
+        # Matriz. TODO outro widget além de Label
+        self.grid = PyQt4.QtGui.QGridLayout()
+        self.grid.setSpacing(0)
+        for i in range(width):
+            for j in range(height):
+                self.grid.addWidget(QtTile(), i, j)
+        layout.addLayout(self.grid)
+
+        self.setLayout(layout)
+        self.show()
+
+    def draw_status(self):
+        selfattrs = self.game.player.get_data()
+        self.hp.signal.emit(selfattrs['hp'])
+        #self.hp.setValue(selfattrs['hp'])
+        #self.hp.update()
+
+    def draw_objects(self):
+        midx = int(self.width / 2)
+        midy = int(self.height / 2)
+
+        selfattrs = self.game.player.get_data()
+        selfx = selfattrs['posx']
+        selfy = selfattrs['posy']
+
+        colors = {'player': PyQt4.QtCore.Qt.red,
+                  'projectile': PyQt4.QtCore.Qt.black,
+                  'rock': PyQt4.QtCore.Qt.gray}
+
+        for i in range(self.width):
+            for j in range(self.height):
+                self.grid.itemAtPosition(i, j).widget().color = PyQt4.QtCore.Qt.green
+
+        for obj in self.game.get_data().values():
+            oattrs = obj.get_data()
+            if 'type' not in oattrs:
+                continue
+
+            ox = midx + oattrs['posx'] - selfx
+            oy = midy + oattrs['posy'] - selfx
+            if (ox not in range(self.width) or oy not in range(self.height)):
+                continue
+
+            self.grid.itemAtPosition(ox, oy).widget().color = colors[oattrs['type']]
+
+        self.grid.itemAtPosition(midx, midy).widget().color = colors[selfattrs['type']]
+
+        for i in range(self.width):
+            for j in range(self.height):
+                self.grid.itemAtPosition(i, j).widget().signal.emit()
+
+    def run(self):
+        while True:
+            self.draw_status()
+            self.draw_objects()
+            time.sleep(self.step)
+
 # Main.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Cliente do jogo',
@@ -259,7 +370,7 @@ if __name__ == "__main__":
             help='O endereço do servidor.')
     parser.add_argument('-u', '--uri', default='/game',
             help='O identificador de recurso do jogo.')
-    parser.add_argument('-r', '--refresh', default=0.1,
+    parser.add_argument('-r', '--refresh', default=0.05,
             help='O tempo entre redesenhos da tela.')
     args = parser.parse_args()
 
@@ -269,6 +380,10 @@ if __name__ == "__main__":
     g.start()
 
     # Cria a interface.
-    curses.wrapper(lambda s: Curses(g, s, args.refresh))
+    #curses.wrapper(lambda s: Curses(g, s, args.refresh))
+    app = PyQt4.QtGui.QApplication(sys.argv)
+    q = Qt(g, 20, 20, args.refresh)
+    q.start()
+    app.exec_()
 
 
