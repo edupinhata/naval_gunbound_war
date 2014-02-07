@@ -44,24 +44,20 @@ class Editor(threading.Thread):
             script.close()
         except: pass
         
-    #função que exclui o ultimo caractere do editor
-    def excludeLastChr(self, buffer):
-        buffer = buffer[0:-1]
-
+    
     def run(self):
         while True:
             c = self.screen.getch()
-            if c == curses.KEY_DC:
+            if c == curses.KEY_DC: #capta a tecla delete. Salva o script
                 with self.buffer_lock:
-                    self.exportScript(self.mybuffer)
-            if c == curses.KEY_RIGHT:
+                    self.exportScript(self.Curses.mybuffer)
+            elif c == curses.KEY_RIGHT: #capta a seta direita. Envia o script
                 with self.buffer_lock:
-                    self.Curses.Game.send_script(self.Curses.mybuffer)
-            if c == curses.KEY_BACKSPACE:
+                    self.Curses.game.send_script(self.Curses.mybuffer)
+            elif c == curses.KEY_BACKSPACE: #capta backsapce para apagar o buffer
                 with self.buffer_lock:
-                    #self.excludeLastChr(self.Curses.mybuffer)
                     self.Curses.mybuffer = self.Curses.mybuffer[0:-1]
-            else:
+            else: #escreve no buffer
                 with self.buffer_lock: 
                     self.Curses.mybuffer += chr(c)
                     self.produtor += 1
