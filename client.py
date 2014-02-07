@@ -131,6 +131,15 @@ class Game(Poller):
 
         self.player = self.create_object(urn)
 
+    #Manda as informações atualizadas 
+    def send_script(self, script):
+        data = {'name': self.name, 'password': self.password,
+                'script': script}
+
+        connection = http.client.HTTPConnection(self.host)
+        connection.request('PUT', self.uri, bytes(json.dumps(data), 'utf-8'))
+        
+
     # Sobrescrito de Poller. Dados recebidos são uma lista de URNs
     # representando cada objetos. URNs que não estão no nosso dicionário são
     # adicionados como objetos novos, e tokens no nosso dicionário que não
